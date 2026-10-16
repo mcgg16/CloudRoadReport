@@ -3,11 +3,9 @@ import { useNavigate } from 'react-router-dom'
 
 function Login() {
     const [loading, setLoading] = useState(false);
-    const [username, setUsername] = useState(''); // Future allow username
+    const [username, setUsername] = useState(''); 
     const [password, setPassword] = useState('');
-    //const [error, setError] = useState('');
     const navigate = useNavigate();
-    //const [user, setUser] = useState<any>(null);
     const [errorMessage, setErrorMessage] = useState('');
 
     return (
@@ -44,6 +42,8 @@ function Login() {
                             className="h-11 px-4 bg-gray-100 rounded-2xl text-zinc-600 focus:outline-2"
                         />
                     </div>
+
+                    <button className="text-white font-bold bg-blue-400 hover:bg-blue-700 py-2 px-4 rounded-2xl">Sign In</button>
                 </div>
 
                 {/* Error display or create account*/}
