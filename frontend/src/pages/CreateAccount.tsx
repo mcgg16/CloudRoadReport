@@ -56,11 +56,12 @@ function CreateAccount() {
                     >Create Account</button>
                 </div>
 
-                {/* Error display or create account*/}
+                {/* Error display or go login or home */}
                 {errorMessage && <p className="text-center rounded-lg bg-red-100 text-red-800 outline-2 outline-red-800 mt-5 mb-1 px-2 py-3">{errorMessage}</p>}
-                <div className="text-center items-center gap-2.5 mt-15">
-                    <p className="text-gray-600 font-semibold">Already have an account?</p>
-                    <a href="/login" className="font-semibold underline hover:text-morado-lakers">Log In</a>
+                <div className="flex flex-col text-center items-center gap-2.5 mt-15 col-1">
+                    <p className="text-black font-semibold">Already have an account?</p>
+                    <a href="/login" className="text-blue-400 hover:text-blue-700 font-semibold underline">Log in</a>
+                    <a href="/" className="text-zinc-600 underline hover:text-blue-700 mt-5">Return Home</a>
                 </div>
             </div>
         </div>
