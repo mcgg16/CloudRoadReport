@@ -147,3 +147,5 @@ python -m flask --app app run --debug --port 5002
 https://blog.miguelgrinberg.com/post/how-to-dockerize-a-react-flask-project Dockerizing a Flask + React project 
 https://github.com/docker/awesome-compose/tree/master/nginx-flask-mysql Docker documentation sample nginx-flask-mysql
 https://stackoverflow.com/questions/75959625/flask-docker-health-check Dockerfile health check
+https://github.com/bahachammakhi/docker-react-nginx-blog Dockerfile for nginx
+https://www.docker.com/blog/how-to-dockerize-react-app/ Dockerize a react app from the docker blog
