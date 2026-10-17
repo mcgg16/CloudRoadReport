@@ -61,45 +61,34 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
     ports:
       - "127.0.0.1:5002:8000"
+    # I origianlly had volumes here, AI tool told me to remove them because the reports container runs w python 
     depends_on:
       db:
         condition: service_healthy
     networks:
       - backend
-  # Reports servies 
-
-  # # Nginx for frontend
-  # nginx: 
-  #   image: nginx:1.30-alpine
-  #   # Volumes defo needs fixing because I have nothing configured right now
-  #   volumes: 
-  #     - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-  #     - ./app/public:/var/www/html/public:ro
-  #   ports: 
-  #     - "${APP_PORT}:80"
-  #   # AI suggestion to “consider making Nginx depend on a healthy app, because it forwards PHP requests to PHP-FPM” 
-  #   depends_on: 
-  #     app: 
-  #       condition: service_healthy
-  #   # I used AI to debug the healthcheck because nginx was unhealthy when I used the assignment-specified localhost, 
-  #   # the prompts are found under README.md Prompts: nginx checking, resulted in change from localhost to 127.0.0.1 in Dockerfile
-  #   healthcheck:
-  #     test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health.php"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 3
-  #   restart: always
-  #   networks: 
-  #     - frontend
+  # frontend nginx
+  frontend: 
+    image: cloudroad-frontend:local
+    build: 
+      context: .
+      dockerfile: frontend/Dockerfile
+    # AI fix I originally had 5173 isntead of the APP_PORT
+    ports: 
+      - "${APP_PORT}:80" 
+    # AI correction I only included reports before oops
+    depends_on: 
+      - accounts
+      - reports
+    networks: 
+      - backend
 
 # Data persistance 
 volumes:
   mariadb_data:
     driver: local
   
-# Define  networks 
+# Define backend network because all of the containers communicate through backend, so no more frontend needed 
 networks: 
-  frontend:
-    driver: bridge
   backend:
     driver: bridge

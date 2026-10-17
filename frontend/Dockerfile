@@ -1,4 +1,4 @@
-syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1
 
 # Stage 1: Build react 
 FROM node:22-alpine AS builder

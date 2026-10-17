@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+//import { useNavigate } from 'react-router-dom'
 
 function Login() {
-    const [loading, setLoading] = useState(false);
+    //const [loading, setLoading] = useState(false);
     const [username, setUsername] = useState(''); 
     const [password, setPassword] = useState('');
-    const navigate = useNavigate();
-    const [errorMessage, setErrorMessage] = useState('');
+    //const navigate = useNavigate();
+    const [errorMessage] = useState(''); //setErrorMessage] = useState('');
 
     return (
         <div className="flex items-center justify-center overflow-hidden">

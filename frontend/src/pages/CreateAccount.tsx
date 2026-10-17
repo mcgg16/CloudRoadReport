@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+// import { useNavigate } from 'react-router-dom'
 
 function CreateAccount() {
-    const [loading, setLoading] = useState(false);
+    // const [loading, setLoading] = useState(false);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     //const [error, setError] = useState('');
-    const navigate = useNavigate();
+    //const navigate = useNavigate();
     //const [user, setUser] = useState<any>(null);
-    const [errorMessage, setErrorMessage] = useState('');
+    const [errorMessage] = useState(''); //, setErrorMessage] = useState('');
 
     // Functions
     const handleClick = () => {
