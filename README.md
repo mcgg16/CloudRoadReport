@@ -142,3 +142,8 @@ source backend/.venv/bin/activate
 cd backend/api-records
 python -m flask --app app run --debug --port 5002
 ```
+
+# Sources
+https://blog.miguelgrinberg.com/post/how-to-dockerize-a-react-flask-project Dockerizing a Flask + React project 
+https://github.com/docker/awesome-compose/tree/master/nginx-flask-mysql Docker documentation sample nginx-flask-mysql
+https://stackoverflow.com/questions/75959625/flask-docker-health-check Dockerfile health check
