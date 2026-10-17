@@ -1,0 +1,36 @@
+services:
+  # MariaDB based on assignment previously done 
+  db:
+    image: mariadb:11.8
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    # Local to database port to 3306 on my computer
+    ports:
+      - "127.0.0.1:${DB_PORT}:3306"
+    # Make data persist
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: always
+    networks: 
+      - backend
+
+# Data persistance 
+volumes:
+  mariadb_data:
+    driver: local
+  
+# Define  networks 
+networks: 
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
