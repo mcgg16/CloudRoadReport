@@ -6,69 +6,109 @@ metadata:
   name: road-config
 # 1. Config 
 data: 
-  REPLICAS: "3"
-  NGINX_PORT: "80"
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_NAME: db_road
+  DB_USER: road_app
 
 ---
-# Databases
+# Database stable inside cluster
+# Here AI suggested the HeadlessService to supply the StatefulSet network identity
 apiVersion: v1
-kind: PersistentVolumeClaim
+# I originally set it up as a PVC not the case
+kind: Service
 metadata: 
   name: db
 spec: 
-  accessModes: 
-    - ReadWriteOnce
-  # Not sure how much storage I should allot to it
-  resources: 
-    requests: 
-      storage: 2Gi
+  clusterIP: None
+  selector: 
+    app: db
+  ports: 
+    - name: mysql
+      protocol: TCP
+      port: 3306
+      targetPort: 3306
 
 ---
 # Services 
-# Depoyment ot manage backend and frontend pods
+# Depoyment to manage backend and frontend pods, originally I had db separated from the StatefulSet but here AI corrected saying I also needed db in the stateful
 apiVersion: apps/v1
-kind: Deployment
-metadata: 
-  name: {{ .Release.Name }}-frontend
-  labels: 
-    app: {{ .Release.Name }}-frontend
-  spec: 
-    # Setting front to 3 replicas, not sure how many I should set 
-    replicas: {{ .values.replicaCount }}
-    selector: 
-      matchLabels: 
-        app {{ .Release.Name }}-frontend
-      spec: 
-        containers: 
-          - name: road-report-app
-          image: "{{ .values.image.repository }}: {{ .values.image.tag }}"
-          # Not sure if its supposed to be the app 8080 port or the nginx serving 8000 or somthing else, plust APP_PORT is from env
-          ports: 
-            - containerPort: ${{APP_PORT}}
-          volumeMounts: 
-            - name: db
-            # No idea what to set the path to
-            mounthPath: /home/jovyan/work
-        # To use PVC
-        volumes: 
-          - name: maria-db
-          # Name that actually matters
-          PersistentVolumeClaim: 
-            claimName: db
+kind: StatefulSet
+metadata:
+  name: db
+spec:
+  serviceName: db
+  replicas: 1
 
----
-# Workloads
-apiVersion: v1
-kind: Service
-metadata: 
-  name: road-service
-# Async creation of LB
-spec: 
-  selector: 
-    app: road-report-app
-  # Use the 8080 port from nginx to the other port, or if I am supposed to be using backend and instaed mapping ports 5001 and 5002 to the nginx 8080? 
-  ports: 
-    - protocol: HTTP
-      port: 8080
-      targetPort: 80
-  type: LoadBalancer
+  selector:
+    matchLabels:
+      app: db
+
+  template:
+    metadata:
+      labels:
+        app: db
+    # Will change image if it changes later on but for now this is the one also in docker-compose
+    spec:
+      containers:
+        - name: mariadb
+          image: mariadb:11.8
+
+          ports:
+            - name: mysql
+              containerPort: 3306
+
+          # Get db info from env w the configMapKeyRef 
+          env:
+            - name: MARIADB_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: road-config
+                  key: DB_NAME
+
+            # To access and use db
+            - name: MARIADB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: road-config
+                  key: DB_USER
+
+            # Getting password and setting as secret 
+            - name: MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: road-db-secret
+                  key: DB_PASSWORD
+
+            # Getting root and setting as secret 
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: road-db-secret
+                  key: DB_ROOT_PASSWORD
+
+          # This AI suggestion
+          volumeMounts:
+            - name: db-data
+              mountPath: /var/lib/mysql
+
+            - name: db-init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+
+      # Set up the memory w the road-db configuration stuff done above, mounts w SQL script
+      volumes:
+        - name: db-init
+          configMap:
+            name: road-db-init
+
+  # To set up persistent memory accross the pods 
+  volumeClaimTemplates:
+    - metadata:
+        name: db-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi

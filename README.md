@@ -153,3 +153,6 @@ https://docs.docker.com/guides/reactjs/ More react for nodejs
 [ a lot of it to get the cloud clusters up and running ]
 https://stackoverflow.com/questions/77764974/how-do-i-deploy-and-run-an-applications-on-k8s Kubernetes on react
 https://medium.com/@cldop.com/deploying-a-two-tier-application-with-flask-reactjs-and-postgresql-on-a-local-kubernetes-cluster-8f0afad8612b 
+https://amlanscloud.com/reactappdeploy/ Kubernetes, useful diagram of architecture
+https://amlanscloud.com/reactappdeploy/ MORE DEPLOYMENTS kubernetes im tired
+https://kubernetes.io/docs/concepts/workloads/controllers/statefulset Stateful set
