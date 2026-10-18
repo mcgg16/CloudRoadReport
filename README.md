@@ -149,3 +149,7 @@ https://github.com/docker/awesome-compose/tree/master/nginx-flask-mysql Docker d
 https://stackoverflow.com/questions/75959625/flask-docker-health-check Dockerfile health check
 https://github.com/bahachammakhi/docker-react-nginx-blog Dockerfile for nginx
 https://www.docker.com/blog/how-to-dockerize-react-app/ Dockerize a react app from the docker blog
+https://docs.docker.com/guides/reactjs/ More react for nodejs
+[ a lot of it to get the cloud clusters up and running ]
+https://stackoverflow.com/questions/77764974/how-do-i-deploy-and-run-an-applications-on-k8s Kubernetes on react
+https://medium.com/@cldop.com/deploying-a-two-tier-application-with-flask-reactjs-and-postgresql-on-a-local-kubernetes-cluster-8f0afad8612b 

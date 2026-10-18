@@ -1,0 +1,15 @@
+replicaCount: 1
+
+image: 
+  # Base repo but I have /accounts, /reports, /frontend; I have the actual docker image here, idk if it should be the github repo instead
+  repository: "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend"
+  tag: latest
+  pullPolicy: IfNotPresent
+
+accounts: 
+  repository: "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts"
+  tag: latest
+
+reports: 
+  repository: "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports"
+  tag: latest
