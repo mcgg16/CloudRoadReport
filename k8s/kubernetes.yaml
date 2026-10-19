@@ -13,13 +13,14 @@ data:
 
 ---
 # Database stable inside cluster
-# Here AI suggested the HeadlessService to supply the StatefulSet network identity
+# Here its the service for db ports service 
 apiVersion: v1
 # I originally set it up as a PVC not the case
 kind: Service
 metadata: 
   name: db
 spec: 
+  # The clusterIP as none configures it as a headless service so that Kubernetes does not load balance the traffic, instead returns individual DNS entries 
   clusterIP: None
   selector: 
     app: db
@@ -30,8 +31,7 @@ spec:
       targetPort: 3306
 
 ---
-# Services 
-# Depoyment to manage backend and frontend pods, originally I had db separated from the StatefulSet but here AI corrected saying I also needed db in the stateful
+# StatefulSet to manage database pods with service defined above, originally I had db separated from the StatefulSet but here AI corrected saying I also needed db in the stateful
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -53,6 +53,139 @@ spec:
       containers:
         - name: mariadb
           image: mariadb:11.8
+
+          ports:
+            - name: mysql
+              containerPort: 3306
+
+          # Get db info from env w the configMapKeyRef 
+          env:
+            - name: MARIADB_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: road-config
+                  key: DB_NAME
+
+            # To access and use db
+            - name: MARIADB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: road-config
+                  key: DB_USER
+
+            # Getting password and setting as secret 
+            - name: MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: road-db-secret
+                  key: DB_PASSWORD
+
+            # Getting root and setting as secret 
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: road-db-secret
+                  key: DB_ROOT_PASSWORD
+
+          # This AI suggestion
+          volumeMounts:
+            - name: db-data
+              mountPath: /var/lib/mysql
+
+            - name: db-init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+
+      # Set up the memory w the road-db configuration stuff done above, mounts w SQL script
+      volumes:
+        - name: db-init
+          configMap:
+            name: road-db-init
+
+  # To set up persistent memory accross the pods 
+  volumeClaimTemplates:
+    - metadata:
+        name: db-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi
+
+---
+# Runs frontend and nginx container deployment
+# So deplopyment creates pod called app: frontend
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: frontend
+
+  # Gets the image itself of the frontend, careful as I modify tags in future updates
+  template:
+    metadata:
+      labels:
+        app: frontend
+    # Here directly gets the img from the repo
+    spec:
+      containers:
+        - name: frontend
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend:v1
+          ports:
+            - containerPort: 80
+
+---
+# Frontend public entrypoint with service 
+apiVersion: v1
+kind: Service 
+metadata: 
+  name: frontend
+spec: 
+  # Adds load balancer to frontend/nginx by GKE 
+  type: LoadBalancer
+
+  # Now servie is selecting the previously labelled pod 
+  selector:  
+    app: frontend
+  
+  # This very much AI suggestion, originally I was mapping to app port but specified I was unsure if I should use port 80 or 8080 from app
+  # Requests arrive to service port 80 and go to pods port 80 to nginx 
+  ports: 
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+
+## STILL IN PROGRESS IM TEMPORAIRLY COMMITING
+---
+# API with load balancing
+apiVersion: apps/v1
+kind: Service
+metadata:
+  name: accounts
+spec:
+  serviceName: accounts
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: db
+
+  template:
+    metadata:
+      labels:
+        app: accounts
+    # Will change image if it changes later on but for now this is the one also in docker-compose
+    spec:
+      containers:
+        - name: accounts
+          image: cloudroad-accounts:local
 
           ports:
             - name: mysql

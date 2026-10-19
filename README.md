@@ -156,3 +156,4 @@ https://medium.com/@cldop.com/deploying-a-two-tier-application-with-flask-reactj
 https://amlanscloud.com/reactappdeploy/ Kubernetes, useful diagram of architecture
 https://amlanscloud.com/reactappdeploy/ MORE DEPLOYMENTS kubernetes im tired
 https://kubernetes.io/docs/concepts/workloads/controllers/statefulset Stateful set
+https://chamszamouri.medium.com/why-stateful-applications-in-k8s-need-a-headless-service-20d3db993872 Stateful set vs headless
