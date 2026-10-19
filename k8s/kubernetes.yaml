@@ -165,10 +165,18 @@ metadata:
 spec:
   replicas: 2
 
+  # Added for rolling updates 
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0 # All originals stay up until a new one is ready to take its place 
+      maxSurge: 1 # One max extra pod created while prepping to replace old pod
+
+  # Now to actually add label to the pod and configure it 
   selector:
     matchLabels:
       app: frontend
-
+  
   # Gets the image itself of the frontend, careful as I modify tags in future updates
   template:
     metadata:
@@ -237,6 +245,13 @@ metadata:
   name: accounts
 spec:
   replicas: 2
+
+  # Added for rolling updates 
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0 # All originals stay up until a new one is ready to take its place 
+      maxSurge: 1 # One max extra pod created while prepping to replace old pod
 
   selector:
     matchLabels:
@@ -325,6 +340,13 @@ metadata:
 # Originally at 1, now at 2 check w $ kubectl get pods -l app=reports -o wide 
 spec:
   replicas: 2
+
+  # Added for rolling updates 
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0 # All originals stay up until a new one is ready to take its place 
+      maxSurge: 1 # One max extra pod created while prepping to replace old pod
 
   selector:
     matchLabels:

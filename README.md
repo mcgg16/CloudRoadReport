@@ -161,3 +161,5 @@ Now moving onto the sub-points like liveness, readiness, and startup
 https://kubernetes.io/docs/concepts/workloads/pods/probes/ Probes to help verify reliability, scalability and rollout/rollback
 https://discuss.kubernetes.io/t/how-to-enable-binlog-for-1-pod-in-galera-mariadb-statefulset/3209 readiness probe for mariadb 
 https://mariadb.com/docs/server/server-management/automated-mariadb-deployment-and-administration/docker-and-mariadb/using-healthcheck-sh Investigating healtcheck, says the healthcheck.sh script is part of official images and part of image mariaDB server
+https://kubernetes.io/docs/concepts/workloads/controllers/deployment/ Deployment and updates theory
+https://www.youtube.com/watch?v=78s-fW-zv6E Example in yaml
