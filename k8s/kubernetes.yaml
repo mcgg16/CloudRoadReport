@@ -189,7 +189,7 @@ spec:
     matchLabels:
       app: accounts
 
-  # Gets the image itself of the frontend, careful as I modify tags in future updates
+  # Gets the image itself of the accounts, careful as I modify tags in future updates
   template:
     metadata:
       labels:
@@ -217,7 +217,7 @@ spec:
                   key: DB_PASSWORD
 
 --- 
-# Backend public entrypoint with service defined above 
+# Private internal entrypoint with service defined above 
 # I had originally added a load balancer, but the AI let me know that each internal service maps the traffic to its pods, 
 # so I can omit a public load balancer and let it handle its internal replicas based on traffic 
 apiVersion: v1
@@ -243,3 +243,62 @@ spec:
 # ====================================================================================
 # BACKEND: REPORTS 
 # ====================================================================================
+# Backend for reports, creating pod and labelling it reports
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reports
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: reports
+
+  # Gets the image itself of the reports, careful as I modify tags in future updates
+  template:
+    metadata:
+      labels:
+        app: reports
+    # Here directly gets the img from the repo
+    spec:
+      containers:
+        - name: reports
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports:v1
+          # Container port 8000 because Gunicorn listens there 
+          ports:
+            - containerPort: 8000
+          
+          # DB specification 
+          envFrom: 
+            - configMapRef: 
+                name: road-config
+
+          # Loads env vals from map 
+          env: 
+            - name: DB_PASSWORD
+              valueFrom: 
+                secretKeyRef: 
+                  name: road-db-secret
+                  key: DB_PASSWORD
+
+--- 
+# Internal private entrypoint with service defined above for reports
+apiVersion: v1
+kind: Service 
+metadata: 
+  name: reports
+spec: 
+  # Making it a cluster IP instead of load balancer, article amlanscloud.com/reactappdeploy specifies that it serves to expose API endpoint within cluster so frontend can access and request data internally 
+  type: ClusterIP
+
+  # Now servie is selecting the previously labelled pod 
+  selector:  
+    app: reports
+  
+  # Go to reports pod guicorn server on port 8000 to then communicate w MariaDB
+  ports: 
+    - name: http
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
