@@ -163,3 +163,6 @@ https://discuss.kubernetes.io/t/how-to-enable-binlog-for-1-pod-in-galera-mariadb
 https://mariadb.com/docs/server/server-management/automated-mariadb-deployment-and-administration/docker-and-mariadb/using-healthcheck-sh Investigating healtcheck, says the healthcheck.sh script is part of official images and part of image mariaDB server
 https://kubernetes.io/docs/concepts/workloads/controllers/deployment/ Deployment and updates theory
 https://www.youtube.com/watch?v=78s-fW-zv6E Example in yaml
+
+Website itself
+https://tutorial101.blogspot.com/2023/04/react-and-python-flask-login-register.html Login 

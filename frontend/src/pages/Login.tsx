@@ -1,5 +1,4 @@
-import { useState } from 'react'
-//import { useNavigate } from 'react-router-dom'
+import { useState } from 'react';
 
 function Login() {
     //const [loading, setLoading] = useState(false);
@@ -7,6 +6,34 @@ function Login() {
     const [password, setPassword] = useState('');
     //const navigate = useNavigate();
     const [errorMessage] = useState(''); //setErrorMessage] = useState('');
+
+    /*const logInUser = () => {
+        if(username.length === 0 && password.length === 0) {
+            setErrorMessage("Please enter a username and password")
+        }
+        else if(username.length === 0) {
+          setErrorMessage("Please enter a username");
+        }
+        else if(password.length === 0) {
+          setErrorMessage("Please enter a password");
+        }
+        else {
+            axios.post('http://127.0.0.1:5000/login', {
+                username: username,
+                password: password
+            })
+            .then(function (response) {
+                console.log(response);
+                navigate("/");
+            })
+            .catch(function (error) {
+                console.log(error, 'error');
+                if (error.response.status === 401) {
+                    setErrorMessage("Invalid credentials");
+                }
+            });
+        }
+    }*/
 
     return (
         <div className="flex items-center justify-center overflow-hidden">

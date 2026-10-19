@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 env_path = Path(__file__).resolve().parents[2] / ".env" # Goes to root folder for env
 load_dotenv(env_path)
 
-
+# Form the connection
 def get_connection():
     return pymysql.connect(
         host=os.environ["DB_HOST"],

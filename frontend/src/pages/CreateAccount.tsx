@@ -1,19 +1,67 @@
 import { useState } from 'react'
-// import { useNavigate } from 'react-router-dom'
+import { useNavigate } from "react-router-dom";
 
 function CreateAccount() {
-    // const [loading, setLoading] = useState(false);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    //const [error, setError] = useState('');
-    //const navigate = useNavigate();
-    //const [user, setUser] = useState<any>(null);
-    const [errorMessage] = useState(''); //, setErrorMessage] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    // Functions
-    const handleClick = () => {
-        console.log('Button clicked!');
-    };
+    const navigate = useNavigate();
+
+    // Create account 
+    async function handleClick() {
+        console.log("Handle the click");
+        setErrorMessage('');
+
+        // Check information 
+        if (username.length === 0 && password.length === 0) {
+            setErrorMessage("Please enter a username and password")
+        }
+        else if (username.length === 0) {
+            setErrorMessage("Please enter a username");
+        }
+        else if (password.length === 0) {
+            setErrorMessage("Please enter a password");
+        } else {
+            // Shows that it is going to load
+            setLoading(true);
+
+            // Sends the query 
+            try {
+                const response = await fetch('/api/accounts/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password,
+                    }),
+                });
+
+                // Waits to see what endpoint says
+                const data = await response.json();
+
+                // Something died
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not create account');
+                }
+
+                console.log('Created user');
+                navigate('/'); // Successful, takes them home with session
+            } catch (error) {
+                setErrorMessage(
+                    error instanceof Error
+                        ? error.message
+                        : 'Could not create account'
+                );
+            } finally {
+                setLoading(false);
+            }
+        }
+
+    }
 
     return (
         <div className="flex items-center justify-center overflow-hidden">
@@ -28,7 +76,7 @@ function CreateAccount() {
                     <div className="flex flex-col gap-1">
                         <label>Username</label>
                         <input
-                            type="username"
+                            type="text"
                             placeholder="Enter your username"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
@@ -51,9 +99,13 @@ function CreateAccount() {
                     </div>
 
                     <button
+                        type="button"
                         onClick={handleClick}
-                        className="text-white font-bold bg-blue-400 hover:bg-blue-700 py-2 px-4 rounded-2xl"
-                    >Create Account</button>
+                        disabled={loading}
+                        className="text-white font-bold bg-blue-400 hover:bg-blue-700 py-2 px-4 rounded-2xl disabled:opacity-50"
+                    >
+                        {loading ? 'Creating account...' : 'Create Account'}
+                    </button>
                 </div>
 
                 {/* Error display or go login or home */}
