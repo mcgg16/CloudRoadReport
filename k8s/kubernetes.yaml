@@ -131,7 +131,7 @@ kind: Deployment
 metadata:
   name: frontend
 spec:
-  replicas: 1
+  replicas: 2
 
   selector:
     matchLabels:
@@ -183,7 +183,7 @@ kind: Deployment
 metadata:
   name: accounts
 spec:
-  replicas: 1
+  replicas: 2
 
   selector:
     matchLabels:
@@ -248,8 +248,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: reports
+# Originally at 1, now at 2 check w $ kubectl get pods -l app=reports -o wide 
 spec:
-  replicas: 1
+  replicas: 2
 
   selector:
     matchLabels:
