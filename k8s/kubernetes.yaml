@@ -162,86 +162,66 @@ spec:
       port: 80
       targetPort: 80
 
-## STILL IN PROGRESS IM TEMPORAIRLY COMMITING
 ---
-# API with load balancing
+# Backend accounts 
+# So deplopyment creates pod labelled app: accounts for that service 
 apiVersion: apps/v1
-kind: Service
+kind: Deployment
 metadata:
   name: accounts
 spec:
-  serviceName: accounts
   replicas: 1
 
   selector:
     matchLabels:
-      app: db
+      app: accounts
 
+  # Gets the image itself of the frontend, careful as I modify tags in future updates
   template:
     metadata:
       labels:
         app: accounts
-    # Will change image if it changes later on but for now this is the one also in docker-compose
+    # Here directly gets the img from the repo
     spec:
       containers:
         - name: accounts
-          image: cloudroad-accounts:local
-
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts:v1
+          # Not sure if it should be the vite port 5001 configured, the nginx.conf at 8000, or 80 for http traffic... I'm setting at 8000 for now... yeah AI says it is 8000 because Gunicorn listens there 
           ports:
-            - name: mysql
-              containerPort: 3306
+            - containerPort: 8000
+          
+          # I had omitted db specification, AI says to use it... I guess frontend doesn't need db, but backend here does 
+          envFrom: 
+            - configMapRef: 
+                name: road-config
 
-          # Get db info from env w the configMapKeyRef 
-          env:
-            - name: MARIADB_DATABASE
-              valueFrom:
-                configMapKeyRef:
-                  name: road-config
-                  key: DB_NAME
-
-            # To access and use db
-            - name: MARIADB_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: road-config
-                  key: DB_USER
-
-            # Getting password and setting as secret 
-            - name: MARIADB_PASSWORD
-              valueFrom:
-                secretKeyRef:
+          # So now has to reference the road-config env values from the config map
+          env: 
+            - name: DB_PASSWORD
+              valueFrom: 
+                secretKeyRef: 
                   name: road-db-secret
                   key: DB_PASSWORD
 
-            # Getting root and setting as secret 
-            - name: MARIADB_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: road-db-secret
-                  key: DB_ROOT_PASSWORD
+--- 
+# Backend public entrypoint with service defined above 
+# I had originally added a load balancer, but the AI let me know that each internal service maps the traffic to its pods, 
+# so I can omit a public load balancer and let it handle its internal replicas based on traffic 
+apiVersion: v1
+kind: Service 
+metadata: 
+  name: accounts
+spec: 
+  # Making it a cluster IP instead of load balancer, article amlanscloud.com/reactappdeploy specifies that it serves to expose API endpoint within cluster so frontend can access and request data 
+  type: ClusterIP
 
-          # This AI suggestion
-          volumeMounts:
-            - name: db-data
-              mountPath: /var/lib/mysql
-
-            - name: db-init
-              mountPath: /docker-entrypoint-initdb.d
-              readOnly: true
-
-      # Set up the memory w the road-db configuration stuff done above, mounts w SQL script
-      volumes:
-        - name: db-init
-          configMap:
-            name: road-db-init
-
-  # To set up persistent memory accross the pods 
-  volumeClaimTemplates:
-    - metadata:
-        name: db-data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 2Gi
+  # Now servie is selecting the previously labelled pod 
+  selector:  
+    app: accounts
+  
+  # Requests arrive to service port 8000 (AI correction, I had 80 previously) through pods and go to pods port 8000 to nginx config 
+  ports: 
+    - name: http
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
