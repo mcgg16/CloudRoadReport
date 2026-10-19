@@ -1,3 +1,6 @@
+# ====================================================================================
+# CONFIGURATION 
+# ====================================================================================
 # ConfigMaps for shared configuration
 # Not sure if since I have app in my frontend, this is front and back or smth?
 apiVersion: v1 
@@ -12,6 +15,10 @@ data:
   DB_USER: road_app
 
 ---
+# ====================================================================================
+# DATABASE 
+# ====================================================================================
+
 # Database stable inside cluster
 # Here its the service for db ports service 
 apiVersion: v1
@@ -114,6 +121,9 @@ spec:
             storage: 2Gi
 
 ---
+# ====================================================================================
+# FRONTEND 
+# ====================================================================================
 # Runs frontend and nginx container deployment
 # So deplopyment creates pod called app: frontend
 apiVersion: apps/v1
@@ -163,6 +173,9 @@ spec:
       targetPort: 80
 
 ---
+# ====================================================================================
+# BACKEND: ACCOUNTS 
+# ====================================================================================
 # Backend accounts 
 # So deplopyment creates pod labelled app: accounts for that service 
 apiVersion: apps/v1
@@ -225,3 +238,8 @@ spec:
       protocol: TCP
       port: 8000
       targetPort: 8000
+
+---
+# ====================================================================================
+# BACKEND: REPORTS 
+# ====================================================================================
