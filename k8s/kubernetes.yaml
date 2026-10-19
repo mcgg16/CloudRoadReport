@@ -94,7 +94,7 @@ spec:
                   name: road-db-secret
                   key: DB_ROOT_PASSWORD
 
-          # This AI suggestion
+          # This AI suggestion to mount data, I had used the joyvan from jupyter but here it is the docker entrypoint instead 
           volumeMounts:
             - name: db-data
               mountPath: /var/lib/mysql
@@ -102,6 +102,38 @@ spec:
             - name: db-init
               mountPath: /docker-entrypoint-initdb.d
               readOnly: true
+          
+          # Checking readiness with a probe 
+          ## First run startup (makes sure app succeeds, useful if app starts slow), readiness (eval app can accept traffic before routing), liveness (checks if app is deadlocked/unhealthy and restarts container if fail threshold of failed tests)
+          # Gives ample time to succeed 
+          startupProbe:
+            exec:
+              command:
+                - healthcheck.sh
+                - --connect
+                - --innodb_initialized
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 60
+
+          # And then check if it can recieve traffic 
+          readinessProbe:
+            exec:
+              command:
+                - healthcheck.sh
+                - --connect
+                - --innodb_initialized
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # livenessProbe: 
+          #   exec: 
+          #     command: 
+          #       - /healthcheck.sh
+          #       - --readiness
+          #     initialDelaySeconds: 60
+          #     periodSeconds: 5
 
       # Set up the memory w the road-db configuration stuff done above, mounts w SQL script
       volumes:
@@ -149,6 +181,27 @@ spec:
           image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend:v1
           ports:
             - containerPort: 80
+          
+          # Probing readiness w initial delay to wait before checking it
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2 
+            failureThreshold: 3
+
+          # Probe liveness on nginx port
+          # Checks ready every five seconds w 2 second timeout, and max fails 3 times before getting purged and having a new one in its place
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2 
+            failureThreshold: 3
 
 ---
 # Frontend public entrypoint with service 
@@ -216,6 +269,27 @@ spec:
                   name: road-db-secret
                   key: DB_PASSWORD
 
+          # Probing readiness w initial delay to let db start up first
+          readinessProbe:
+            httpGet:
+              path: /api/accounts/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2 
+            failureThreshold: 3
+
+          # Probe liveness on nginx port
+          # Checks ready every five seconds w 2 second timeout, and max fails 3 times before getting purged and having a new one in its place
+          livenessProbe:
+            httpGet:
+              path: /api/accounts/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2 
+            failureThreshold: 3
+
 --- 
 # Private internal entrypoint with service defined above 
 # I had originally added a load balancer, but the AI let me know that each internal service maps the traffic to its pods, 
@@ -282,6 +356,27 @@ spec:
                 secretKeyRef: 
                   name: road-db-secret
                   key: DB_PASSWORD
+
+          # Probing readiness w initial delay to let db start up first
+          readinessProbe:
+            httpGet:
+              path: /api/reports/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2 
+            failureThreshold: 3
+
+          # Probe liveness on nginx port
+          # Checks ready every five seconds w 2 second timeout, and max fails 3 times before getting purged and having a new one in its place
+          livenessProbe:
+            httpGet:
+              path: /api/reports/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2 
+            failureThreshold: 3
 
 --- 
 # Internal private entrypoint with service defined above for reports

@@ -156,3 +156,8 @@ https://medium.com/@cldop.com/deploying-a-two-tier-application-with-flask-reactj
 https://amlanscloud.com/reactappdeploy/ Kubernetes, useful diagram of architecture
 https://kubernetes.io/docs/concepts/workloads/controllers/statefulset Stateful set
 https://chamszamouri.medium.com/why-stateful-applications-in-k8s-need-a-headless-service-20d3db993872 Stateful set vs headless
+
+Now moving onto the sub-points like liveness, readiness, and startup
+https://kubernetes.io/docs/concepts/workloads/pods/probes/ Probes to help verify reliability, scalability and rollout/rollback
+https://discuss.kubernetes.io/t/how-to-enable-binlog-for-1-pod-in-galera-mariadb-statefulset/3209 readiness probe for mariadb 
+https://mariadb.com/docs/server/server-management/automated-mariadb-deployment-and-administration/docker-and-mariadb/using-healthcheck-sh Investigating healtcheck, says the healthcheck.sh script is part of official images and part of image mariaDB server
