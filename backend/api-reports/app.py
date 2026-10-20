@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pymysql
 from flask import Flask, request, jsonify, session
 from db import get_connection
+from zoneinfo import ZoneInfo # To handle requests with time zones
 
 app = Flask(__name__)
 
@@ -39,24 +40,37 @@ def make_report():
         return {"error": "Expected report as JSON"}, 400
 
     # POST with report info
-    observed_at = data.get("observed_at") # May differ from default wheras submitted_at does adhere perfectly
-    condition_id = data.get("condition_id")
-    region_id = data.get("region_id")
-
-    # One of them is empty 
-    if not isinstance(observed_at, user_id, condition_id, region_id):
-        return {"error": "Missing information to generate report"}, 400
+    observed_at = data.get("observeTime") # May differ from default wheras submitted_at does adhere perfectly
+    condition_id = data.get("conditionId")
+    region_id = data.get("regionId")
     
-    # Check numeric foreign keys are valid, shouldn't even be needed though
+    if not isinstance(observed_at, str) or not observed_at:
+        return {"error": "Observation time is required"}, 400
+
     if type(condition_id) is not int or condition_id <= 0:
         return {"error": "Select a valid condition"}, 400
 
     if type(region_id) is not int or region_id <= 0:
         return {"error": "Select a valid region"}, 400
-    
-    # If no observed time, set it to current time 
-    if observed_at is None: 
-        observation = datetime.now(timezone.utc)
+
+    try:
+        brisbane_now = datetime.now(ZoneInfo("Australia/Brisbane"))
+
+        observation = datetime.strptime(observed_at, "%H:%M").replace(
+            year=brisbane_now.year,
+            month=brisbane_now.month,
+            day=brisbane_now.day,
+            tzinfo=ZoneInfo("Australia/Brisbane"),
+        )
+
+        if observation > brisbane_now:
+            return {"error": "Observation time cannot be in the future"}, 400
+
+        # Store as UTC because your database connection uses UTC.
+        observation = observation.astimezone(timezone.utc).replace(tzinfo=None)
+
+    except ValueError:
+        return {"error": "Invalid observation time"}, 400
         
     # Get rid of timezone info, AI suggestion
     observation = observation.replace(tzinfo=None)
@@ -83,29 +97,21 @@ def make_report():
         # For error logging
         return {"id": id, "user_id": user_id, "region_id": region_id, "condition_id": condition_id}, 201
 
-    # Got SQL error from non-unique username 
+    # Got SQL error referencing key dne
     except pymysql.IntegrityError as error:
-        # Error inserting
-        app.logger.exception("Report failed")
-        return {"error": "Could not create make report"}, 500
-
-    # Something else failed
-    except pymysql.MySQLError:
         if connection is not None:
             connection.rollback()
-            
-        # AI suggestion because that ID rejects foreign keys that do not exist in referenced table
+
         if error.args[0] == 1452:
-            return {"error": "User, region, or condition no longer exists"}, 400
+            return {"error": "Foreign key does not exist"}, 400
 
-        app.logger.exception("Report insertion failed")
         return {"error": "Could not create report"}, 500
-    
+
+    # DB down
     except pymysql.MySQLError:
         if connection is not None:
             connection.rollback()
 
-        app.logger.exception("Report database error")
         return {"error": "Database temporarily unavailable"}, 503
 
     # Once done, closes the connection

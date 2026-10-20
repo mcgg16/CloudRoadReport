@@ -60,7 +60,6 @@ function CreateAccount() {
                 setLoading(false);
             }
         }
-
     }
 
     return (
