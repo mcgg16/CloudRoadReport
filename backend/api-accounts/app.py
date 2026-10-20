@@ -194,11 +194,11 @@ def login():
         if connection is not None:
             connection.close()
 
-@app.route("/logout")
+# AI Correction 201 is resource created, it suggested 200 instead success
+@app.post("/api/accounts/logout")
 def logout():
-    # Erase session token
     session.clear()
-    return {"success": "Logged out"}, 201
+    return {"success": "Logged out"}, 200
 
 # AI suggestion to check session
 @app.get("/api/accounts/session")

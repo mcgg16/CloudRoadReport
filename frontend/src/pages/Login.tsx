@@ -69,7 +69,7 @@ function Login() {
             {/* Centered login card */}
             <div className="relative flex flex-col items-center w-full max-w-sm px-8 py-10">
 
-                <h1 className="text-2xl font-bold text-center mb-1">Log In</h1>
+                <h1 className="text-2xl font-bold text-center mb-1">Login</h1>
                 <p className="text-gray-600 mb-6">Glad you're back!</p>
 
                 {/* Capture data, first email/username */}
