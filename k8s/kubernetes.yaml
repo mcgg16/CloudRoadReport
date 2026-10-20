@@ -187,7 +187,7 @@ spec:
       containers:
         - name: frontend
           # Updated now to v2 to handle login
-          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend:v3
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend:v4
           imagePullPolicy: Always # Added from AI suggestion to check if there are new images
           ports:
             - containerPort: 80
@@ -269,7 +269,7 @@ spec:
       containers:
         - name: accounts
           # Should handle the authentication, login and session
-          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts:v3
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts:v4
           imagePullPolicy: Always
           # Not sure if it should be the vite port 5001 configured, the nginx.conf at 8000, or 80 for http traffic... I'm setting at 8000 for now... yeah AI says it is 8000 because Gunicorn listens there 
           ports:
@@ -371,7 +371,7 @@ spec:
     spec:
       containers:
         - name: reports
-          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports:v1
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports:v2
           imagePullPolicy: Always
           # Container port 8000 because Gunicorn listens there 
           ports:
