@@ -143,6 +143,8 @@ cd backend/api-records
 python -m flask --app app run --debug --port 5002
 ```
 
+It also helped implement sessions with command ```bash python3 -c "import secrets; print(secrets.token_hex(32))"```
+
 # Sources
 https://blog.miguelgrinberg.com/post/how-to-dockerize-a-react-flask-project Dockerizing a Flask + React project 
 https://github.com/docker/awesome-compose/tree/master/nginx-flask-mysql Docker documentation sample nginx-flask-mysql
@@ -166,3 +168,4 @@ https://www.youtube.com/watch?v=78s-fW-zv6E Example in yaml
 
 Website itself
 https://tutorial101.blogspot.com/2023/04/react-and-python-flask-login-register.html Login 
+https://www.geeksforgeeks.org/python/how-to-add-authentication-to-your-app-with-flask-login/ Login

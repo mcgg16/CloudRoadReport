@@ -1,13 +1,21 @@
 import { useState } from 'react';
+import { useNavigate } from "react-router-dom";
 
 function Login() {
     //const [loading, setLoading] = useState(false);
     const [username, setUsername] = useState(''); 
     const [password, setPassword] = useState('');
     //const navigate = useNavigate();
-    const [errorMessage] = useState(''); //setErrorMessage] = useState('');
+    const [errorMessage, setErrorMessage] = useState(''); //setErrorMessage] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    /*const logInUser = () => {
+    const navigate = useNavigate();
+
+    async function handleLogin() {
+        // Base field checks
+        console.log("Handle the login");
+        setErrorMessage('');
+
         if(username.length === 0 && password.length === 0) {
             setErrorMessage("Please enter a username and password")
         }
@@ -18,22 +26,43 @@ function Login() {
           setErrorMessage("Please enter a password");
         }
         else {
-            axios.post('http://127.0.0.1:5000/login', {
-                username: username,
-                password: password
-            })
-            .then(function (response) {
-                console.log(response);
-                navigate("/");
-            })
-            .catch(function (error) {
-                console.log(error, 'error');
-                if (error.response.status === 401) {
-                    setErrorMessage("Invalid credentials");
+            // Shows that it is going to load
+            setLoading(true);
+
+            // Sends the query 
+            try {
+                const response = await fetch('/api/accounts/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password,
+                    }),
+                });
+
+                // Waits to see what endpoint says
+                const data = await response.json();
+
+                // Something died
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not log in');
                 }
-            });
+
+                console.log('Logged in user');
+                navigate('/'); // Successful, takes them home with session
+            } catch (error) {
+                setErrorMessage(
+                    error instanceof Error
+                        ? error.message
+                        : 'Could not log user in'
+                );
+            } finally {
+                setLoading(false);
+            }
         }
-    }*/
+    }
 
     return (
         <div className="flex items-center justify-center overflow-hidden">
@@ -70,7 +99,14 @@ function Login() {
                         />
                     </div>
 
-                    <button className="text-white font-bold bg-blue-400 hover:bg-blue-700 py-2 px-4 rounded-2xl">Sign In</button>
+                    <button
+                        type="button"
+                        onClick={handleLogin}
+                        disabled={loading}
+                        className="text-white font-bold bg-blue-400 hover:bg-blue-700 py-2 px-4 rounded-2xl disabled:opacity-50"
+                    >
+                        {loading ? 'Logging in...' : 'Log In'}
+                    </button>
                 </div>
 
                 {/* Error display or create account*/}

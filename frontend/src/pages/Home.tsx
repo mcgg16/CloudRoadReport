@@ -9,6 +9,15 @@ function Home() {
 
   // When page loads, it should get all of the reports
   useEffect(() => {
+    // Checks if user is logged in to see if lets them access stuff or not
+    useEffect(() => {
+      async function getSession() {
+        try {
+          const response = await fetch('/api/accounts/session')
+        }
+      }
+    })
+
     let ignore = false;
 
     // Uses here the flask api route to fetch the region reports
