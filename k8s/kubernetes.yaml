@@ -186,7 +186,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend:v1
+          # Updated now to v2 to handle login
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend:v2
           ports:
             - containerPort: 80
           
@@ -266,7 +267,8 @@ spec:
     spec:
       containers:
         - name: accounts
-          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts:v1
+          # Should handle the authentication, login and session
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts:v2
           # Not sure if it should be the vite port 5001 configured, the nginx.conf at 8000, or 80 for http traffic... I'm setting at 8000 for now... yeah AI says it is 8000 because Gunicorn listens there 
           ports:
             - containerPort: 8000
