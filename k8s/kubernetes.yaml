@@ -187,7 +187,7 @@ spec:
       containers:
         - name: frontend
           # Updated now to v2 to handle login
-          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend:v2
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend:v3
           imagePullPolicy: Always # Added from AI suggestion to check if there are new images
           ports:
             - containerPort: 80

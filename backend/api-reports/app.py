@@ -113,6 +113,18 @@ def make_report():
         if connection is not None:
             connection.close()
 
+# Get information from db for pop-ups
+## Get conditions
+@app.get("api/reports/conditions")
+def get_conditions(): 
+    
+    return
+
+## Get region id and name
+@app.get("api/reports/names")
+def get_region_names():
+    return 
+
 # Get region reports 
 @app.get("/api/reports/regions")
 def get_regions():
