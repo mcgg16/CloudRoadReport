@@ -78,7 +78,7 @@ def make_report():
     
     # Establish connection to make the post
     try:
-        connection = get_connection()
+        connection = get_connection() # AI suggestion for time zones
         
         # SQL query to execute, and extract id that was just generated with %s to pass the strings
         with connection.cursor() as cursor:
@@ -166,20 +166,90 @@ def get_region_names():
 # Get region reports 
 @app.get("/api/reports/regions")
 def get_regions():
+    connection = None 
+    
     try:
-        connection = get_connection()
+        connection = get_connection() # Timezone handling suggested by AI after I asked for help w query
 
+        # I made a rough query, AI helped fix it w correct """ formatting and actual logit to calculate the times and info per category, and better 12 hour handling that uses the cross join to insted filter it out when making the query
         try:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT id, name FROM regions ORDER BY id"
+                    """
+                    SELECT
+                        r.id AS region_id,
+                        r.name AS region_name,
+                        c.id AS condition_id,
+                        c.name AS condition_name,
+
+                        COUNT(
+                            CASE
+                                WHEN p.observed_at >= NOW() - INTERVAL 10 MINUTE
+                                THEN p.id
+                            END
+                        ) AS reports_10_minutes,
+
+                        COUNT(
+                            CASE
+                                WHEN p.observed_at >= NOW() - INTERVAL 1 HOUR
+                                THEN p.id
+                            END
+                        ) AS reports_1_hour,
+
+                        COUNT(p.id) AS reports_12_hours
+
+                    FROM regions AS r
+
+                    CROSS JOIN conditions AS c
+
+                    LEFT JOIN reports AS p
+                        ON p.region_id = r.id
+                        AND p.condition_id = c.id
+                        AND p.observed_at >= NOW() - INTERVAL 12 HOUR
+                        AND p.observed_at <= NOW()
+
+                    GROUP BY r.id, r.name, c.id, c.name
+                    ORDER BY r.id, c.id
+                    """
                 )
-                regions = cursor.fetchall()
+                rows = cursor.fetchall() # Changed regions -> rows AI suggestion
+                
+            # After I asked AI for help correcting the query, it also gave this method to jsonify manually
+            regions = {}
+            
+            # Iterates to build region id and the observed conditions
+            for row in rows: 
+                region_id = row["region_id"]
+                condition = row["condition_name"]
+                
+                # Current id not a region, sets it to blank info
+                if region_id not in regions:
+                    regions[region_id] = {
+                        "id": region_id,
+                        "name": row["region_name"],
+                        "counts": {
+                            "last_10_minutes": {},
+                            "last_hour": {},
+                            "last_12_hours": {},
+                        },
+                    }
+
+                # Counts per category
+                counts = regions[region_id]["counts"]
+                counts["last_10_minutes"][condition] = row["reports_10_minutes"]
+                counts["last_hour"][condition] = row["reports_1_hour"]
+                counts["last_12_hours"][condition] = row["reports_12_hours"]
+                    
+            # Done building list
+            return jsonify(list(regions.values()))
+        
         finally:
-            connection.close()
+            if connection is not None:
+                connection.close()
 
-        return jsonify(regions)
-
+    # Error handling
     except pymysql.MySQLError:
-        app.logger.exception("Could not retrieve regions")
+        app.logger.exception("Could not retrieve regional report counts")
         return {"error": "Database temporarily unavailable"}, 503
+
+    

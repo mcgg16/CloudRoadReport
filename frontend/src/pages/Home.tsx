@@ -154,10 +154,10 @@ function Home() {
 
       <div className="mt-2">
         {regions.map((region) => (
+          // I was originally passing all vals manually but AI suggested to use ... as shortcut to pass everything else as well
           <RegionCard
             key={region.id}
-            id={region.id}
-            name={region.name}
+            {...region}
           />
         ))}
       </div>

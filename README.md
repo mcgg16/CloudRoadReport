@@ -179,6 +179,7 @@ https://tutorial101.blogspot.com/2023/04/react-and-python-flask-login-register.h
 https://www.geeksforgeeks.org/python/how-to-add-authentication-to-your-app-with-flask-login/ Login
 https://stackoverflow.com/questions/77868617/state-management-of-multiple-buttons Button families
 https://stackoverflow.com/questions/40575501/how-do-i-properly-get-the-date-and-time Time
+https://tailwindcss.com/docs/table-layout tables
 
 https://bytebytego.com/guides/what-does-a-typical-microservice-architecture-look-like/ Diagram
 https://www.geeksforgeeks.org/system-design/microservices/ Diagram 
