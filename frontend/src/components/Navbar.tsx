@@ -1,11 +1,10 @@
 //import { useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 function Navbar() {
     const [loggedIn, setLoggedIn] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
-    const navigate = useNavigate();
     const location = useLocation(); // To check when page changes
 
     // Checks if user is logged in to see if lets them access stuff or not
@@ -75,13 +74,13 @@ function Navbar() {
 
     return (
         <div>
-            <nav className="flex justify-between items-center h-16 font-semibold bg-blue-200 p-6 px-10">
+            <nav className="flex justify-between items-center text-lg h-16 font-semibold bg-blue-200 p-6 px-10">
 
                 <a href="/" className="text-gray-700 hover:text-blue-600 transition-colors">Home</a>
                 {!loggedIn ?
                     <div className="flex justify-right">
-                        <a href="/login" className="mr-6">Login</a>
-                        <a href="/register">Register</a>
+                        <a href="/login" className="mr-8 underline hover:text-white">Login</a>
+                        <a href="/register" className="underline hover:text-white">Register</a>
                     </div>
                     :
                     <div>
