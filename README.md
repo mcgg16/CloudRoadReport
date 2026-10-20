@@ -1,13 +1,23 @@
 # Project Installation
 Open virtual machine 
 
-Pull repository from GitHub: ```bash git pull ```
-
-Type cd/CloudRoadReport
+Pull repository from GitHub: ```git clone https://github.com/mcgg16/CloudRoadReport && cd CloudRoadReport/```
 
 For local testing, ```docker compose build``` to build the services, then ```docker compose up -d``` and access via http:<EXTERNAL_IP>:8080. 
 
-To test with kubernetes, ```cd k8s``` and generate session secret token with ```script for secret.sh```, then ```kubectl apply -f kubernetes.yaml``` to initiate the service. Type ```kubectl get services``` and check the external IP address assigned to LOAD BALANCER pod, and access the website with http:<LOAD_BALANCER_EXTERNAL> to interact with the website. 
+To test with kubernetes, check which project is being used with ```gcloud config get-value project``` and generate the cluster with the following command, modifying zone with respect to the virtual machine used and project id as necessary
+```bash
+gcloud container clusters resize road-report-cluster \
+  --node-pool=default-pool \
+  --num-nodes=3 \
+  --zone=ZONE \
+  --project=ID
+```
+
+Then, navigate to the kubernetes folder with ```cd k8s``` and generate session secret token by running ```bash k8s/setup_session_secret.sh``` in order to authenticate users. Then, run ```kubectl apply -f kubernetes.yaml``` and wait for the configuration to be applied. Afterwards, type ```kubectl get services``` and wait for the service named frontend of type LoadBalancer to come online. It will generate an EXTERNAL-IP, type http://<EXTERNAL_IP> in the browser. 
+
+## Basic project flow
+Once installed, there will be no users configured, so it is necessary to click on "Register" in the navigation bar, and then click the button "+ Make report" and choose a suburb, road condition, and time of observation. Once done, click "Submit" and, if the report time was set within the last 12 hours, watch how the suburb table is modified accordingly. Once you are done, click on "Sign Out". If you wish to log in again, use the same credentials to start your session. Please note the session has a duration of six hours, after which signing in again will be necessary to submit a report.
 
 # AI Declaration
 ## TODO 
