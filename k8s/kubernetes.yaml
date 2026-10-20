@@ -285,6 +285,12 @@ spec:
                 secretKeyRef: 
                   name: road-db-secret
                   key: DB_PASSWORD
+            # AI suggestion to also add secret key generated with the setup_session_secret.sh
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: road-session-secret
+                  key: SECRET_KEY
 
           # Probing readiness w initial delay to let db start up first
           readinessProbe:
