@@ -269,7 +269,7 @@ spec:
       containers:
         - name: accounts
           # Should handle the authentication, login and session
-          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts:v2
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts:v3
           imagePullPolicy: Always
           # Not sure if it should be the vite port 5001 configured, the nginx.conf at 8000, or 80 for http traffic... I'm setting at 8000 for now... yeah AI says it is 8000 because Gunicorn listens there 
           ports:
@@ -389,6 +389,12 @@ spec:
                 secretKeyRef: 
                   name: road-db-secret
                   key: DB_PASSWORD
+            # Use key to make sure only users with sessions can make reports
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: road-session-secret
+                  key: SECRET_KEY
 
           # Probing readiness w initial delay to let db start up first
           readinessProbe:
