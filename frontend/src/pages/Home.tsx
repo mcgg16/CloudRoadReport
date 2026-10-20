@@ -112,9 +112,13 @@ function Home() {
           {loggedIn ? <p>Welcome back {username}!</p> : <p>Log in to make reports!</p>}
         </div>
 
-        {/* Will be the button to make a report */}
+        {/* Will be the button to make a report, must be logged in, reroute to then either get the pop-up or make the report */}
         <div>
-          <button className="text-white font-bold bg-blue-400 hover:bg-blue-700 py-4 px-4 rounded-2xl">+ Make report</button>
+          {loggedIn ?
+            <button className="text-white font-bold bg-blue-400 hover:bg-blue-700 py-4 px-4 rounded-2xl">+ Make report</button>
+            :
+            <button className="text-white font-bold bg-gray-500 hover:bg-gray-800 py-4 px-4 rounded-2xl">Sign in to report</button>
+          }
         </div>
       </div>
 
