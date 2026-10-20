@@ -83,6 +83,12 @@ def register():
         # All went smoothly, 
         connection.commit()
 
+        # Sets the session with created account
+        session.clear()
+        session.permanent = True
+        session["user_id"] = user_id
+        session["username"] = username
+
         # For error logging
         return {"id": user_id, "username": username}, 201
 
