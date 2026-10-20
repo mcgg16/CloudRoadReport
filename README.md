@@ -1,5 +1,13 @@
-# CloudRoadReport
-Project for INFS3208 class
+# Project Installation
+Open virtual machine 
+
+Pull repository from GitHub: ```bash git pull ```
+
+Type cd/CloudRoadReport
+
+For local testing, ```docker compose build``` to build the services, then ```docker compose up -d``` and access via http:<EXTERNAL_IP>:8080. 
+
+To test with kubernetes, ```cd k8s``` and generate session secret token with ```script for secret.sh```, then ```kubectl apply -f kubernetes.yaml``` to initiate the service. Type ```kubectl get services``` and check the external IP address assigned to LOAD BALANCER pod, and access the website with http:<LOAD_BALANCER_EXTERNAL> to interact with the website. 
 
 # AI Declaration
 ## TODO 
@@ -169,3 +177,6 @@ https://www.youtube.com/watch?v=78s-fW-zv6E Example in yaml
 Website itself
 https://tutorial101.blogspot.com/2023/04/react-and-python-flask-login-register.html Login 
 https://www.geeksforgeeks.org/python/how-to-add-authentication-to-your-app-with-flask-login/ Login
+
+https://bytebytego.com/guides/what-does-a-typical-microservice-architecture-look-like/ Diagram
+https://www.geeksforgeeks.org/system-design/microservices/ Diagram 

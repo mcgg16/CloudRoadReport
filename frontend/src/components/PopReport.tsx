@@ -28,7 +28,7 @@ function PopReport({ open, onClose }: OpenPopReportState) {
 
             <div className="relative w-100 z-10 bg-white rounded-2xl p-6">
                 <div className="flex justify-between gap-8">
-                    <h1 className="text-lg">Submit a Report</h1>
+                    <h2 className="text-lg font-bold">Submit a Report</h2>
 
                     {/* Close pop-up */}
                     <button
@@ -40,9 +40,42 @@ function PopReport({ open, onClose }: OpenPopReportState) {
                     </button>
                 </div>
 
-                {/* Rest of pop-up body */}
-                <div className="flex flex-col items-center">
+                {/* Rest of pop-up body fields and button */}
+                <div className="flex flex-col items-center text-center">
                     {/* All the data fields */}
+                    <div className="flex flex-col items-center justify-center py-2 my-2">
+                        {/* Region */}
+                        <div>
+                            <h3 className="text-lg font-semibold">Region</h3>
+                            <p>Select the region to report</p>
+                        </div>
+
+                        {/* Condition with description */}
+                        <div>
+                            <h3 className="text-lg font-semibold mt-3">Select road condition</h3>
+                            <div className="grid grid-cols-2">
+                                <div>
+                                    <p>1</p>
+                                    <p>2</p>
+                                </div>
+                                <div>
+                                    <p>3</p>
+                                    <p>4</p>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {/* Time column */}
+                        <div>
+                            <h3 className="text-lg font-semibold mt-3">Time of observation</h3>
+                            <div className="flex flex-row">
+                                <p>Hour</p>
+                                <p>Minutes</p>
+                                <p>am/pm</p>
+                            </div>
+                        </div>
+                    </div>
 
 
                     {/* Close the pop-up */}
