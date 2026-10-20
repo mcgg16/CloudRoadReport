@@ -114,16 +114,48 @@ def make_report():
             connection.close()
 
 # Get information from db for pop-ups
-## Get conditions
+## Get conditions to display in dropdown
 @app.get("api/reports/conditions")
 def get_conditions(): 
-    
+    try:
+        connection = get_connection()
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT id, name, description FROM conditions ORDER BY id"
+                )
+                conditions = cursor.fetchall()
+        finally:
+            connection.close()
+
+        return jsonify(conditions)
+
+    except pymysql.MySQLError:
+        app.logger.exception("Could not retrieve regions")
+        return {"error": "Database temporarily unavailable"}, 503
     return
 
 ## Get region id and name
 @app.get("api/reports/names")
 def get_region_names():
-    return 
+    try:
+        connection = get_connection()
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT id, name FROM regions ORDER BY id"
+                )
+                names = cursor.fetchall()
+        finally:
+            connection.close()
+
+        return jsonify(names)
+
+    except pymysql.MySQLError:
+        app.logger.exception("Could not retrieve region names")
+        return {"error": "Database temporarily unavailable"}, 503 
 
 # Get region reports 
 @app.get("/api/reports/regions")
