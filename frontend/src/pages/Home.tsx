@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import RegionCard from '../components/RegionCard';
 import type { Region } from '../types/types';
+import PopReport from '../components/PopReport';
 
 function Home() {
   const [regions, setRegions] = useState<Region[]>([]); // List of regions
@@ -8,6 +9,9 @@ function Home() {
   const [error, setError] = useState('');
   const [username, setUsername] = useState(''); // Default will not be logged in 
   const [loggedIn, setLoggedIn] = useState(false);
+
+  // For pop-up report
+  const [openPop, setOpenPop] = useState(false);
 
   // Checks if user is logged in to see if lets them access stuff or not
   useEffect(() => {
@@ -101,6 +105,17 @@ function Home() {
     };
   }, []);
 
+  // Open pop-up to make a report
+  function openPopReport() {
+    console.log("Pressed open report");
+    setOpenPop(true);
+  }
+
+  // Handler to close the pop-up
+  function closePopReport() {
+    setOpenPop(false);
+  }
+
   return (
     <div className="p-6 px-2">
       {/* Header with report and button to make a report */}
@@ -114,11 +129,22 @@ function Home() {
 
         {/* Will be the button to make a report, must be logged in, reroute to then either get the pop-up or make the report */}
         <div>
-          {loggedIn ?
-            <button className="text-white font-bold bg-blue-400 hover:bg-blue-700 py-4 px-4 rounded-2xl">+ Make report</button>
-            :
-            <button className="text-white font-bold bg-gray-500 hover:bg-gray-800 py-4 px-4 rounded-2xl">Sign in to report</button>
-          }
+          {loggedIn ? (
+            <button
+              type="button"
+              onClick={openPopReport}
+              className="text-white font-bold bg-blue-400 hover:bg-blue-700 py-4 px-4 rounded-2xl"
+            >
+              + Make report
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="text-white font-bold bg-gray-500 hover:bg-gray-800 py-4 px-4 rounded-2xl"
+            >
+              Sign in to report
+            </button>
+          )}
         </div>
       </div>
 
@@ -135,6 +161,9 @@ function Home() {
           />
         ))}
       </div>
+
+      {/* Potentially render the popup */}
+      <PopReport open={openPop} onClose={closePopReport} />
     </div>
   )
 }
