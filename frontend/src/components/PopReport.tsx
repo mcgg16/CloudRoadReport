@@ -13,6 +13,17 @@ function PopReport({ open, onClose }: OpenPopReportState) {
     const [conditions, setConditions] = useState<Conditions[]>([]); // To show buttons w name and mini description for standarizing
     const [conditionId, setConditionId] = useState(1); // Default sets it to dry condition, let the user pick a new one
 
+    // Gets current time for report
+    function getCurrentTime() {
+        const now = new Date();
+
+        return `${String(now.getHours()).padStart(2, '0')}:${String(
+            now.getMinutes()
+        ).padStart(2, '0')}`;
+    }
+
+    const [observeTime, setObserveTime] = useState(getCurrentTime);
+
     // Get regions
     useEffect(() => {
         if (!open) {
@@ -177,7 +188,7 @@ function PopReport({ open, onClose }: OpenPopReportState) {
                                         key={condition.id}
                                         type="button"
                                         onClick={() => setConditionId(condition.id)}
-                                        className={`rounded-xl text-center px-2 py-2 ${conditionId == condition.id ? 'bg-blue-300' : 'bg-gray-100 hover:bg-gray-400'}`}
+                                        className={`rounded-2xl text-center px-2 py-2 ${conditionId == condition.id ? 'bg-blue-300' : 'bg-gray-100 hover:bg-gray-400'}`}
                                     >
                                         <p className="font-bold">{condition.name}</p>
 
@@ -191,9 +202,14 @@ function PopReport({ open, onClose }: OpenPopReportState) {
                         <div>
                             <h3 className="text-lg font-semibold mt-3">Time of observation</h3>
                             <div className="flex flex-row">
-                                <p>Hour</p>
-                                <p>Minutes</p>
-                                <p>am/pm</p>
+                                <input
+                                    name="time"
+                                    type="time"
+                                    value={observeTime}
+                                    onChange={(event) => setObserveTime(event.target.value)}
+                                    placeholder="--:-- ----"
+                                    className="h-11 px-4 bg-gray-100 rounded-2xl"
+                                />
                             </div>
                         </div>
                     </div>
@@ -204,7 +220,7 @@ function PopReport({ open, onClose }: OpenPopReportState) {
                         type="button"
                         onClick={submitReport}
                         disabled={loading}
-                        className="mt-6 text-white font-bold bg-blue-400 hover:bg-blue-700 py-2 px-4 rounded-2xl disabled:opacity-50"
+                        className="mt-4 text-white font-bold bg-blue-400 hover:bg-blue-700 py-2 px-8 py-6 rounded-2xl disabled:opacity-50"
                     >
                         {loading ? 'Submitting...' : 'Submit'}
                     </button>
