@@ -115,7 +115,7 @@ def make_report():
 
 # Get information from db for pop-ups
 ## Get conditions to display in dropdown
-@app.get("api/reports/conditions")
+@app.get("/api/reports/conditions")
 def get_conditions(): 
     try:
         connection = get_connection()
@@ -137,7 +137,7 @@ def get_conditions():
     return
 
 ## Get region id and name
-@app.get("api/reports/names")
+@app.get("/api/reports/names")
 def get_region_names():
     try:
         connection = get_connection()
