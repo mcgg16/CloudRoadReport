@@ -836,74 +836,853 @@ CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--access-logfile",
 It also suggested a root .dockerignore that I did add with the .git, .env, python configurations, nodemodules and dist files. 
 The main correction was that I was supposed to be running the backend Dockerfile first instead of mixing both weirdly. It also helped with commands to build and test it locally.
 
-## Base docker compose 
-```yaml
-version: '3.8'
+## Basic Frontend Architecture and Nginx
+### Basic API to home connection
+Vite
+```
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
+import tailwindcss from '@tailwindcss/vite'
 
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+})
+```
+
+I have a pages file Home where I want to fetch from there all of the regions as a json list with their respective counts, and then a RegionCard.tsx that contains the name of the region and later on I'll link it to the ocmponent RegionTable, but I want to make the query step by step first so that first I just get the RegionCard. I dont really remember how i should work w lists or props, like I know I wil have to recieve the full list because i get this from the endpoint but to then extract individual regions and their reports sounds complicated...&#x20;
+
+
+
+Sample:&#x20;
+
+[\
+&#x20; {\
+&#x20;   "id": 1,\
+&#x20;   "name": "South Bank"\
+&#x20; },\
+&#x20; {\
+&#x20;   "id": 2,\
+&#x20;   "name": "Kangaroo Point"\
+&#x20; }
+
+]
+
+
+
+I have build in src another folder Types so I have types, components and pages all within my frontend folder.&#x20;
+
+import RegionCard from '../components/RegionCard.tsx';\
+import RegionListProp from  '../types/types.tsx'\
+\
+function Home() {\
+\
+&#x20; return (\
+&#x20;   \<div className="p-6 px-2">\
+&#x20;     \<h1 className="text-2xl font-bold bg-blue">Road Report\</h1>\
+&#x20;     \<h2>Find out what the road conditions are like in Brisbane to plan your morning ride!\</h2>\
+&#x20;     {/\* Iterate over it to pass the region cards, one row is one region card so it autogenerates them \*/}\
+&#x20;     \<RegionCard>\</RegionCard>\
+&#x20;   \</div>\
+&#x20; )\
+}\
+\
+export default Home
+
+
+
+import RegionProp from '../types/types.tsx'\
+\
+function RegionCard( {id, name}: RegionProp ) {\
+&#x20;   return (\
+&#x20;       \<div>\
+&#x20;           \<h1 className="xl">{id}. {name}\</h1>\
+&#x20;       \</div>\
+&#x20;   )\
+}\
+\
+export default RegionCard;
+
+
+
+types/types.tsx
+
+export default type RegionListProp = {\
+&#x20;   id: number;\
+&#x20;   name: string;  \
+}\
+\
+export default type RegionProp = {\
+&#x20;   id: number;\
+&#x20;   name: string;  \
+}
+
+#### Application
+I do not know how to connect a monorepo to the API, since I learned React with supabase and we just called external RPCs. The output helped me configure the proxy with the api ports to match the API containers so that Nginx could later forward the containers, so I added the following to vite.config.ts
+
+```
+server: {
+    proxy: {
+      '/api/reports': {
+        target: 'http://127.0.0.1:5002',
+      },
+      '/api/accounts': {
+        target: 'http://127.0.0.1:5001',
+      },
+    },
+}
+```
+
+It also suggested renaming the types folder to types.ts, and it corrected the region props extraction that whould be defined with ```function RegionCard({ id, name }: Region) ```. It also provided the key useEffect funtion that I used in future parts of the assingment to understand how to make requests to the API endpoints and mapping the outputs. 
+```
+import { useEffect, useState } from 'react';
+import RegionCard from '../components/RegionCard';
+import type { Region } from '../types/types';
+
+function Home() {
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadRegions() {
+      try {
+        const response = await fetch('/api/reports/regions');
+
+        if (!response.ok) {
+          throw new Error(`Could not load regions (${response.status})`);
+        }
+
+        const data: Region[] = await response.json();
+
+        if (!ignore) {
+          setRegions(data);
+        }
+      } catch (error) {
+        if (!ignore) {
+          setError(
+            error instanceof Error
+              ? error.message
+              : 'Could not load regions'
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadRegions();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  return (
+    <div className="p-6 px-2">
+      <h1 className="text-2xl font-bold">Road Report</h1>
+
+      <h2>
+        Find out what the road conditions are like in Brisbane
+        to plan your morning ride!
+      </h2>
+
+      {loading && <p>Loading regions...</p>}
+      {error && <p role="alert">{error}</p>}
+
+      {regions.map((region) => (
+        <RegionCard
+          key={region.id}
+          id={region.id}
+          name={region.name}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default Home;
+```
+
+### Nginx
+Thank you, I love you. It worked. Now here is my attempt to configure nginx and the react in the dockerfile. I am lost, i used a few repos as inspo but i don't know what approach to take, i am scared.&#x20;
+
+
+
+Here is my measly attempt&#x20;
+```
+syntax=docker/dockerfile:1
+
+FROM nginx:1.13-alpine AS builder
+# I currently have frontend/vite.config.ts with the server listening for the ports, not sure if I should copy to app/composer.json or smth else that does not exsist yet 
+WORKDIR frontend
+# Nginx connection
+COPY /vite.config.ts /etc/nginx/conf.d/default.conf
+# Stuff for react code 
+COPY package*.json ./ 
+
+# Install dependencies
+RUN npm install
+
+# Copy rest of source code 
+COPY . . 
+# Not sure if I should run dev, build, or soemthing more complex
+RUN npm run dev 
+
+# Make sure "node" user owns app files
+RUN chown -R node:node /app
+
+# Switch to node user 
+USER node 
+
+# Expose Vite dev port, not sure if I should use 5173 or the env APP_PORT=8080
+EXPOSE 5173 
+
+# Run Vite in dev mode, accessible outside the container
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+## OTHER VERSIONS I FOUND
+# Idk if i should expose the APP_PORT 8080 or localhost 5173 or the port when i do npm run build or smth... the one I had done with nginx had an ap copy exposing 9000 and CMD ["php-fpm", "-F"]
+#EXPOSE 8080
+
+# I foudn this for a build enviornment, i think i can probably use dev no? Like as long as its on the cloud, i am okay? 
+RUN yarn
+RUN yarn build
+
+# production environment
+FROM nginx:stable-alpine
+COPY --from=build /app/build /usr/share/nginx/html
+COPY --from=build /app/nginx/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+#### Application
+It let me know I was combining Vite development and serving with Nginx, it told me I should use a node to build react and nginx to serve the frontend, and it provided key suggestions to fix my Dockerfile. I would like to mention I did use sources first to write my Dockerfile attempt and then corrected with AI suggestions
+```
+# syntax=docker/dockerfile:1
+
+# Stage 1: build React
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+COPY frontend/package*.json ./
+
+RUN npm ci
+
+COPY frontend/ ./
+
+RUN npm run build
+
+# Stage 2: serve the generated files
+FROM nginx:1.30-alpine
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+It also specified I should make a base nginx.conf that I had neglected: 
+```
+server {
+    listen 80;
+    server_name localhost;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location /api/accounts/ {
+        proxy_pass http://accounts:8000;
+    }
+
+    location /api/reports/ {
+        proxy_pass http://reports:8000;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+## Base GKE deployment
+### Guidance of how to start working on GitHub or Kubernetes
+Okay, so... it's sunday now. i need your help w the brainstorm of what i have to do. I install gcloud on my machine, and then i have to navigate away from the vm to the gcloud containers clusters create road-report-cluster --zone=\_\_ --num-nodes=3, then get the cluster credentials... i am seeing that kubernetes cannot build images from local dockerfile directly and needs to pull them, so idk if i can just pull from github the same project or if i have to demonstrate it works solely from my main vm, or if from my vm i can initiate the kubernetes as well. Then configure docker authentication for gcp with gcloud auth configure-docker us-central1-docker.pkg.dev, build my image with docker and push to the repo or something? and then convert or write thee kubernetes manifsts, like a k8s folder for the backend and for the frontend (maybe also for database?) do not proivde the answers for the work though please, i want to just see what i am supposed to do or what direction to take, what to resaerch. and then idk if just run kubectl to deploy to gke.
+
+
+
+I had previously worked on a kubernetes file, but we were given a data folder, and then in root a FAISS.ipynb, a commands.sh, and a setup_kupyter_secret.sh.&#x20;
+
+
+
+Here is the base kubernetes file I had written
+```
+# INFS3208 A2 
+# Do not rename Kubernetes objects, labels, ports, or volume names.
+
+# -----------------------------------------------------------------------------
+# 1. Shared FAISS configuration
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: faiss-config
+# 1. Config shared FAISS, will use in pt 3 to consume it
+data: 
+  FAISS_MAX_SHARDS: "3"
+  FAISS_SERVICE: "faiss-headless"
+  FAISS_PORT: "8000"
+  DEFAULT_TOP_K: "5"
+
+
+---
+# -----------------------------------------------------------------------------
+# 2. Headless Service for stable FAISS shard network identities
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: faiss-headless
+# 2. Deploy FAISS headless
+spec:
+  # Critical it's None to set it as headless, aka doesn't allocate cluster IP and exposes pod thru own DNS record so apps comm w pods directly and bypass load balancing, useful stte apps, distributed dbs, etc. 
+  clusterIP: None
+  # Ensures service targets pods that are labelled as app
+  selector: 
+    app: faiss-shard # AI suggested correction, I found my-app in documentation
+  # Map service port to target 
+  ports: 
+  - port: 8000 # AI correction, it exposes instead 8000:8000
+    targetPort: 8000 # Expose internal shard port, AI suggest correction because I'd done ${FAISS_PORT} but can't use yaml as vars
+
+
+---
+# -----------------------------------------------------------------------------
+# 3. FAISS shard StatefulSet
+# Use the following image for the StatefulSet: 
+# australia-southeast1-docker.pkg.dev/infs3208-429801/infs3208-a2/faiss-shard:2026-a2
+# -----------------------------------------------------------------------------
+# Used to make stateful app and distributed sys
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: faiss-shard
+spec:
+  serviceName: "faiss-headless" 
+  replicas: 3 # For faiss-shard-0, faiss-shard-1, and faiss-shard-2
+  selector: 
+    matchLabels: 
+      app: faiss-shard
+  # AI correction, missed template info 
+  template: 
+    metadata: 
+      labels: 
+        app: faiss-shard
+
+    # Now for the shard configs from images, AI correction must be nested within template
+    spec: 
+      # Adding from AI suggestion to attempt fix jupyter notebook
+      securityContext:
+        fsGroup: 1000
+        
+      containers:
+      - name: faiss-shard
+        # Using img from course instructs
+        image: ackesnalxu/infs3208-faiss-shard:2026-a2# australia-southeast1-docker.pkg.dev/infs3208-429801/infs3208-a2/faiss-shard:2026-a2
+        ports: 
+          - containerPort: 8000 # AI corrected, I put 80 cause I thought it was internal 80 but it's the FAISS Port instead oops!
+        # Uses the config from pt 1 to create env vars for container
+        envFrom: 
+          - configMapRef: 
+              name: faiss-config
+        # Configure volume mounts at /data 
+        volumeMounts: 
+          - name: faiss-data
+            mountPath: /data # AI suggestion was to add the extra two spaces for indentation, I had forgotten them and it was level with the dash
+  # From documentation at height of template
+  volumeClaimTemplates: 
+    - metadata: 
+        name: faiss-data
+      spec:
+        accessModes:
+          - ReadWriteOnce # To make data persistent
+        resources:
+          requests:
+            storage: 1Gi # Storage per shard 
+
+---
+# -----------------------------------------------------------------------------
+# 4. PROVIDED Jupyter workspace PVC
+# Do not modify this object. It protects notebook changes if the Jupyter Pod is
+# recreated while you are working.
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jupyter-workspace
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# -----------------------------------------------------------------------------
+# 5. Jupyter Notebook Deployment
+# Use the following image for the Deployment: 
+# australia-southeast1-docker.pkg.dev/infs3208-429801/infs3208-a2/jupyter:2026-a2
+# -----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jupyter
+spec: 
+  replicas: 1 # Line suggested by AI upon asking for feedback
+
+  # Selector and template suggested by AI, I had not included it 
+  selector:
+    matchLabels: 
+      app: jupyter
+
+  template: 
+    metadata: 
+      labels: 
+        app: jupyter
+    # Now from here is work that I had done nested into the template that I had not considered
+    spec: 
+      # Added upon AI suggestion for issue w the joyce mounting
+      securityContext: 
+        fsGroup: 1000
+
+      containers: 
+        - name: jupyter
+          image: ackesnalxu/infs3208-jupyter:2026-a2# australia-southeast1-docker.pkg.dev/infs3208-429801/infs3208-a2/jupyter:2026-a2
+          ports: 
+            - containerPort: 8888
+          envFrom: 
+            - configMapRef: 
+                name: faiss-config
+            # AI correction, I'd done secret: secretName w jupyter-secret and a key and path to the setup file, but apparetnly secret already applied to cluster upon exec so I don't need to provide the path
+            - secretRef: 
+                name: jupyter-secret
+          # Mounting on the volume 
+          volumeMounts: 
+            - name: jupyter-workspace
+              mountPath: /home/jovyan/work
+      # To use the PVC
+      volumes: 
+        - name: jupyter-workspace
+          persistentVolumeClaim: 
+            claimName: jupyter-workspace # This is the one that matters 
+
+---
+# -----------------------------------------------------------------------------
+# 6. Public Jupyter Service
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: jupyter-service
+# Async creation of LB
+spec: 
+  # Using from part 5 name
+  selector: 
+    app: jupyter
+  ports: 
+    - protocol: TCP 
+      port: 8080 # Externally exposes port I think, AI suggested change from containerPort to port and removing a leading -
+      targetPort: 8888 # Fowards traffic to jupyter port
+  type: LoadBalancer
+```
+
+And here is the commands.sh
+```
+# Task 1: Deploy/update all Kubernetes objects in kubernetes.yaml.
+# YOUR COMMAND:
+kubectl apply -f kubernetes.yaml
+
+# Task 2: Display the Pods and StatefulSets so you can verify the
+# Jupyter Pod and all FAISS shard replicas.
+# YOUR COMMAND(S):
+# Note, AI correction I had kubectl get pods --watch -l app=jupyter, changed to only get pods
+kubectl get pods
+kubectl get statefulset
+
+# Task 3: Display PersistentVolumeClaims and show detailed
+# information for the faiss-shard StatefulSet.
+# YOUR COMMAND(S): 
+# Note, I had written kubectl describe pvc jupyter-workspace, statefulset faiss-shard, prompted to AI I was unsure whether to describe both of them so it suggested get pvc and then describe the sts faiss-shard
+kubectl get pvc
+kubectl describe statefulset faiss-shard
+```
+
+#### Application
+It suggested I separate GitHub from the image registry, and that I shoudl read through the documentation for the following: "Research creating a Docker-format Artifact Registry repository, authenticating Docker, tagging images with registry paths, and pushing them. Authentication alone does not create the repository. The hostname must match your chosen registry location; us-central1 is an example, not a requirement." It also told me to translatee comose into kubernetes objects with the following structure: 
+
+| Your application needs | Kubernetes concept to research |
+|---|---|
+| Run frontend, accounts, reports | **Deployment** for each |
+| Stable internal addresses between components | **ClusterIP Services** |
+| Public entry point for the frontend | **LoadBalancer Service** |
+| Database settings without passwords | **ConfigMap** |
+| Database passwords | **Secret** |
+| One MariaDB instance with persistent storage | **StatefulSet + PersistentVolumeClaim** |
+| Initialise database tables and sample regions | Mount your small SQL script through a **ConfigMap** |
+| Route traffic only to ready application instances | **Readiness probes** |
+| Spread application replicas across machines | **Topology spread constraints or pod anti-affinity** |
+
+It also told me I needed database manifests with PVC, with one database replica. 
+
+### Basic image setup
+Erm issue... $ gcloud services enable artifactregistry.googleapis.com \
+  --project=project-5472a16f-e6cd-4347-b79
+supermoniguz@instance-2:~$ gcloud artifacts repositories list \
+  --location=australia-southeast2 \
+  --project=project-5472a16f-e6cd-4347-b79
+Listing items under project project-5472a16f-e6cd-4347-b79, location australia-southeast2.
+
+Listed 0 items.
+supermoniguz@instance-2:~$ gcloud artifacts repositories list
+Listing items under project project-5472a16f-e6cd-4347-b79, across all locations.
+
+Listed 0 items.
+supermoniguz@instance-2:~$ 
+
+Im creating the image repository
+
+Hm since i got this update: 
+supermoniguz@instance-2:~$ gcloud auth configure-docker australia-southeast2-docker.pkg.dev
+Adding credentials for: australia-southeast2-docker.pkg.dev
+After update, the following will be written to your Docker config file located at [/home/supermoniguz/.docker/config.json]:
+ {
+  "credHelpers": {
+    "australia-southeast2-docker.pkg.dev": "gcloud"
+  }
+}
+
+Do you want to continue (Y/n)?  y
+
+Docker configuration file updated.
+
+Should i update any code in my config.json, or is it just updating the app image itself without necessairly touching my source code? 
+
+--
+I made the tags a bit messed up, but the pushes worked now:
+not a valid repository/tag: invalid reference format
+supermoniguz@instance-2:~/CloudRoadReport$ docker tag cloudroad-accounts:local australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report
+supermoniguz@instance-2:~/CloudRoadReport$ docker tag cloudroad-accounts:local "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts:v1
+"
+supermoniguz@instance-2:~/CloudRoadReport$ docker tag cloudroad-accounts:local "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports:v1"
+supermoniguz@instance-2:~/CloudRoadReport$ docker tag cloudroad-accounts:local "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/f^C1"
+supermoniguz@instance-2:~/CloudRoadReport$ docker tag cloudroad-accounts:local "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts:v1"
+supermoniguz@instance-2:~/CloudRoadReport$ docker tag cloudroad-reports:local "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports:v1"
+supermoniguz@instance-2:~/CloudRoadReport$ docker tag cloudroad-frontend:local "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend:v1"
+supermoniguz@instance-2:~/CloudRoadReport$ docker push "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts:v1"
+
+gcloud artifacts docker images list australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report --include-tags
+Listing items under project project-5472a16f-e6cd-4347-b79, location australia-southeast2, repository road-report.
+
+IMAGE                                                                                    DIGEST                                                                   TAGS  CREATE_TIME          UPDATE_TIME          SIZE
+australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts  sha256:0389980d461298140f737768a813c926deb0bb8f02539647dd0aed50874abf93        2026-10-18T09:53:22  2026-10-18T09:53:22  1543
+australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts  sha256:37ecebc3d9bdf0b30343dc5ff3e81979ddcbba6b9a051459e8f4e816ef8dab2f  v1    2026-10-18T09:53:22  2026-10-18T09:53:22  None
+australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts  sha256:ecc30bedb067494ec6559edbdf1da0c6a6fd162131595bf686249918765b3591        2026-10-18T09:53:22  2026-10-18T09:53:22  48923300
+australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend  sha256:30e810d9511a0d1bcac86dcf4ad08a0614f9f85899451eac7fc215b45e6dfb11  v1    2026-10-18T09:54:38  2026-10-18T09:54:38  None
+australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend  sha256:5e4dac1fab524f611bf9a649321d60df41cf82ac8086e8ede1046628919da6ac        2026-10-18T09:54:38  2026-10-18T09:54:38  1691
+australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend  sha256:b3714a7acde8842f2aee7e145768b690dd60bda87df5eebb87bac968b6c6526a        2026-10-18T09:54:38  2026-10-18T09:54:38  7987133
+australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports   sha256:34e34808668e79b92b8b90bbec9efbb7fb0aa37839d7e2564680ed3363c41d2e  v1    2026-10-18T09:54:15  2026-10-18T09:54:15  None
+australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports   sha256:60fea69a5cda52135445674291387695ffd960b907b3819f365554f65da638c5        2026-10-18T09:54:15  2026-10-18T09:54:15  1542
+australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports   sha256:7171a21d7e012d2c33194b2dcf501c68bdc914e14b47be7ce4caa9555908e02b        2026-10-18T09:54:15  2026-10-18T09:54:15  48923526
+
+#### Application
+It let me know. I did upload the images, but config.json belongs on Docker on VM not in the project, and it gave me commands to show the authentications that I used with another prompt to enable permissions.
+```
+gcloud container node-pools describe default-pool \
+  --cluster=road-report-cluster \
+  --zone=australia-southeast2-b \
+  --project=project-5472a16f-e6cd-4347-b79 \
+  --format="yaml(config.serviceAccount,config.oauthScopes)"
+```
+
+## Working on kubernetes.yaml
+### Base kubernetes file
+Okay well then, here is my attempt at a kubernetes.yaml and I did a values.yaml but tbh I think its kinda useless because a lot of it is already in my docker-compose no?&#x20;
+
+
+
+Here is the base docker-compose:&#x20;
+```
 services:
-  # Database Service (MariaDB)
+  # MariaDB based on assignment previously done 
   db:
-    image: mariadb:latest
-    container_name: mariadb_db
-    restart: always
+    image: mariadb:11.8
     environment:
-      MARIADB_ROOT_PASSWORD: rootpassword
-      MARIADB_DATABASE: mydb
-      MARIADB_USER: user
-      MARIADB_PASSWORD: password
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    # Local to database port to 3306 on my computer
     ports:
-      - "3306:3306"
+      - "127.0.0.1:${DB_PORT}:3306"
+    # Make data persist
     volumes:
-      - db_data:/var/lib/mysql
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-
-  # Backend Service (Flask)
-  backend:
-    build: ./backend
-    container_name: flask_backend
+      - mariadb_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: always
+    networks: 
+      - backend
+  
+  # Accounts service
+  accounts:
+    image: cloudroad-accounts:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        API_SERVICE: api-accounts
     environment:
-      - DATABASE_URL=mysql+pymysql://user:password@db:3306/mydb
-      - FLASK_ENV=development
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5001:8000"
     depends_on:
-      - db
-
-  # Frontend Service (React)
-  frontend:
-    build: ./frontend
-    container_name: react_frontend
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      - CHOKIDAR_USECHOKING=true
-    depends_on:
+      db:
+        condition: service_healthy
+    networks:
       - backend
 
+  # Reports service 
+  reports:
+    image: cloudroad-reports:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        API_SERVICE: api-reports
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5002:8000"
+    # I origianlly had volumes here, AI tool told me to remove them because the reports container runs w python 
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+  # frontend nginx
+  frontend: 
+    image: cloudroad-frontend:local
+    build: 
+      context: .
+      dockerfile: frontend/Dockerfile
+    # AI fix I originally had 5173 isntead of the APP_PORT
+    ports: 
+      - "${APP_PORT}:80" 
+    # AI correction I only included reports before oops
+    depends_on: 
+      - accounts
+      - reports
+    networks: 
+      - backend
+
+# Data persistance 
 volumes:
-  db_data:
+  mariadb_data:
+    driver: local
+  
+# Define backend network because all of the containers communicate through backend, so no more frontend needed 
+networks: 
+  backend:
+    driver: bridge
+```
+
+Here is what I have for my values.yaml:
+```
+replicaCount: 3
+
+image: 
+  # Base repo but I have /accounts, /reports, /frontend; I have the actual docker image here, idk if it should be the github repo instead
+  repository: "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend"
+  tag: latest
+  pullPolicy: IfNotPresent
+
+accounts: 
+  repository: "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/accounts"
+  tag: latest
+
+reports: 
+  repository: "australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports"
+  tag: latest
 ```
 
 
-Nvm I am using Chat instead for basic flask setup, run these from project root
-```bash
-source backend/.venv/bin/activate
-cd backend/api-accounts
-python -m flask --app app run --debug --port 5001
-```
-http://127.0.0.1:5001/api/accounts/health
 
-For the records
-```bash
-source backend/.venv/bin/activate
-cd backend/api-records
-python -m flask --app app run --debug --port 5002
+Here is for my kubernetes.yaml, i just manually set it to one replica here. it is sunday 11 pm, idk what a good stopping point today would be... i wanted to have the hole app up and running
+```
+# ConfigMaps for shared configuration
+# Not sure if since I have app in my frontend, this is front and back or smth?
+apiVersion: v1 
+kind: ConfigMap
+metadata:
+  name: road-config
+# 1. Config 
+data: 
+  REPLICAS: "3"
+  NGINX_PORT: "8000"
+
+---
+# Databases
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: 
+  name: db
+spec: 
+  accessMode: 
+    - ReadWriteOnce
+  # Not sure how much storage I should allot to it
+  resources: 
+    requests: 
+      storage: 2Gi
+
+---
+# Services 
+# Depoyment ot manage backend and frontend pods
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: {{ .Release.Name }}-frontend
+  labels: 
+    app: {{ .Release.Name }}-frontend
+  spec: 
+    # Setting front to 3 replicas, not sure how many I should set 
+    replicas: {{ .values.replicaCount }}
+    selector: 
+      matchLabels: 
+        app {{ .Release.Name }}-frontend
+      spec: 
+        containers: 
+          - name: road-report-app
+          image: "{{ .values.image.repository }}: {{ .values.image.tag }}"
+          # Not sure if its supposed to be the app 8080 port or the nginx serving 8000 or somthing else, plust APP_PORT is from env
+          ports: 
+            - containerPort: ${{APP_PORT}}
+          volumeMounts: 
+            - name: db
+            # No idea what to set the path to
+            mounthPath: /home/jovyan/work
+        # To use PVC
+        volumes: 
+          - name: maria-db
+          # Name that actually matters
+          PersistentVolumeClaim: 
+            claimName: db
+
+---
+# Workloads
+apiVersion: v1
+kind: Service
+metadata: 
+  name: road-service
+# Async creation of LB
+spec: 
+  selector: 
+    app: road-report-app
+  # Use the 8080 port from nginx to the other port, or if I am supposed to be using backend and instaed mapping ports 5001 and 5002 to the nginx 8080? 
+  ports: 
+    - protocol: HTTP
+      port: 8080
+      targetPort: 80
+  type: LoadBalancer
 ```
 
+#### Application
+It let me know I was mixing up Helm templates from one of the resources I used with kubernetes YAML with the values, so it let me know I should instead use a ConfigMap and provided key sugestions to fix the volumeClaimTemplates, database configurations, among other fixes. It also let me know I needed to create the SQL ConfigMap manually.
+
+```
+kubectl create configmap road-db-init \
+  --from-file=01-init.sql=database/init.sql \
+  --dry-run=client -o yaml \
+  | kubectl apply -f -
+```
+
+And it also let me know I should create database secrets with the env to reference them with 
+```
+kubectl create secret generic road-db-secret \
+  --from-env-file=.env.k8s \
+  --dry-run=client -o yaml \
+  | kubectl apply -f -
+```
+
+It also gave me a key command to visualize the database that I used later in the project for debugging, where I needed to enter the DB_PASSWORD
+```
+kubectl exec -it db-0 -- mariadb -u road_app -p db_road
+```
+```
+SHOW TABLES;
+SELECT COUNT(*) FROM regions;
+exit;
+```
+
+### Base kubernetes frontend configuration
+okay here is my draft kubernetes.yaml for the frontend, it would help me to distinguish between service and a stateful set I think and yeah
+```
+# Frontend connection 
+# Uses a load balancer  
+apiVersion: apps/v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  serviceName: frontend
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: frontend
+
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      # Not sure if its supposed to be a selector with app: app or something like that, and isntaed for ports establish TCP protocil or HTTP and map poarts 80:80 
+      containers:
+        - name: frontend
+          # Same image as in the docker compose 
+          image: cloudroad-frontend:local
+
+          ports:
+            - "${APP_PORT}:80" 
+          type: LoadBalancers
+
+          # Not sure if I need to add the volumeMounts and the respective volumes section to use db.init with the config map cause it's using db but idk if ithat needs any cofiguration
+```
+
+#### Application
+
+#### Session
 It also helped implement sessions with command ```bash python3 -c "import secrets; print(secrets.token_hex(32))"```
 
 # Sources
