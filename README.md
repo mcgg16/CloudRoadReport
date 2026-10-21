@@ -1681,6 +1681,188 @@ spec:
 ```
 
 #### Application
+Key correction was that I was mixing workload that runs containers, and a Service that routes traffic to them, it suggested that frontend should use a Deployment + Service. 
+| Object | Responsibility | Your project |
+|---|---|---|
+| **Deployment** | Creates/replaces interchangeable Pods and controls their replica count | Frontend, accounts API, reports API |
+| **StatefulSet** | Manages Pods with stable identities and associated persistent storage | MariaDB |
+| **Service** | Provides a stable network address and routes requests to matching Pods | Frontend’s public address; internal API/database addresses |
+
+It let me know "A Service doesn’t run containers, so it has no container image, Pod template, or replica count. Deployments and StatefulSets manage those. Official workload overview."
+
+And I needed to separate definitions with ---. 
+
+This is what it also suggested
+"- Remove serviceName from the Deployment; that field belonged to your StatefulSet.
+- Use the Artifact Registry image, because cloudroad-frontend:local only exists on the machine where you built it.
+- Remove "${APP_PORT}:80". That’s Compose syntax. Kubernetes uses separate numeric port and targetPort fields; it doesn’t automatically read your .env.
+- No database mounts on the frontend. Its React files and Nginx configuration are already inside the image. It communicates with the APIs, which connect to MariaDB.
+- One replica is fine for the baseline. Increase it after the full application works.
+Before applying the frontend, we need the accounts and reports Services. Your Nginx configuration resolves those names at startup; if they don’t exist, Nginx may fail to start. The next step is to define each API’s Deployment and internal ClusterIP Service, keeping their Service names accounts and reports and their ports 8000."
+
+With that, I had a bit of guidance knowing what else I had to work on after that.
+
+### Base kubernetes accounts configuration
+Here is my attempt for the accounts, not sure if I should set the clusterIP: None and make it headless vs adding a  load balancer, cause I don't know if just having a balancer on the frontend is too limited because I need to handle more an insurge of like reports (more important reports than the number of accounts or logins I'd say, but they need to be logged in to make a reprot so yeah)... let me know what you think and provide feedback on accoutns so that I can fix it and then try to implement it on reports.&#x20;
+
+
+```
+# Backend accounts 
+# So deplopyment creates pod called app: accounts for that service 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: accounts
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: accounts
+
+  # Gets the image itself of the frontend, careful as I modify tags in future updates
+  template:
+    metadata:
+      labels:
+        app: accounts
+    # Here directly gets the img from the repo
+    spec:
+      containers:
+        - name: frontend
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports:v1
+          # Not sure if it should be the vite port 5001 configured, the nginx.conf at 8000, or 80 for http traffic... I'm setting at 8000 for now
+          ports:
+            - containerPort: 8000
+
+--- 
+# Backend public entrypoint with service defined above 
+apiVersion: v1
+kind: Service 
+metadata: 
+  name: accounts
+spec: 
+  # Adds load balancer to backend accounts 
+  type: LoadBalancer
+
+  # Now servie is selecting the previously labelled pod 
+  selector:  
+    app: accounts
+  
+  # Requests arrive to service port 80 through pods and go to pods port 8000 to nginx I think, not sure 
+  ports: 
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8000
+```
+
+#### Application
+It told me "Use a normal ClusterIP Service for accounts and reports. It routes internal traffic across their replicas; you don’t need a public load balancer for every API", that I had acidentally reused the frontend image name, and it let me know I had forgotten to add the env values from the configuration map that I should add at port level.
+
+```
+envFrom:
+  - configMapRef:
+      name: road-config
+
+env:
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: road-db-secret
+        key: DB_PASSWORD
+```
+
+This is the corrected configuration example it gave me without prompting, which I compared against my original attempts to understand it better
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: accounts
+spec:
+  type: ClusterIP
+
+  selector:
+    app: accounts
+
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+```
+
+It also let me know the overall flow for my clarification was Nginx → accounts Service port 8000 → accounts Pod port 8000 → Gunicorn/Flask.
+
+### Base kubernetes reports configuration
+what do you think of this now? 
+```
+# Backend for reports, creating pod and labelling it reports
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reports
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: reports
+
+  # Gets the image itself of the frontend, careful as I modify tags in future updates
+  template:
+    metadata:
+      labels:
+        app: reports
+    # Here directly gets the img from the repo
+    spec:
+      containers:
+        - name: reports
+          image: australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/reports:v1
+          # Container port 8000 because Gunicorn listens there 
+          ports:
+            - containerPort: 8000
+          
+          # DB specification 
+          envFrom: 
+            - configMapRef: 
+                name: road-config
+
+          # Loads vals from env onto pod
+          env: 
+            - name: DB_PASSWORD
+              valueFrom: 
+                secretKeyRef: 
+                  name: road-db-secret
+                  key: DB_PASSWORD
+
+--- 
+# Backend public entrypoint with service defined above for reports
+apiVersion: v1
+kind: Service 
+metadata: 
+  name: reports
+spec: 
+  # Making it a cluster IP instead of load balancer, article amlanscloud.com/reactappdeploy specifies that it serves to expose API endpoint within cluster so frontend can access and request data 
+  type: ClusterIP
+
+  # Now servie is selecting the previously labelled pod 
+  selector:  
+    app: reports
+  
+  # Requests arrive to service port 8000 (AI correction, I had 80 previously) through pods and go to pods port 8000 to nginx config 
+  ports: 
+    - name: http
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+```
+
+#### Application
+I used the previous accounts section as a base for my reports, it just provided clarifications
+"Gets the image itself of the frontend” → reports API image.
+“Backend public entrypoint” → internal entry point; ClusterIP doesn’t expose it publicly.
+“Loads vals from env” → loads the password from a Kubernetes Secret.
+“Go to pods port 8000 to nginx config” → go to the reports Pod’s Gunicorn server on port 8000."
 
 #### Session
 It also helped implement sessions with command ```bash python3 -c "import secrets; print(secrets.token_hex(32))"```
