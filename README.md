@@ -1864,8 +1864,1245 @@ I used the previous accounts section as a base for my reports, it just provided 
 “Loads vals from env” → loads the password from a Kubernetes Secret.
 “Go to pods port 8000 to nginx config” → go to the reports Pod’s Gunicorn server on port 8000."
 
+### Accessing the frontend with kubernetes
+oops i had forgotten to resize my cluster to start it up again, now they're slowly going back up again. All of the ports have started up:
+```
+ kubectl get pods,deployments,services
+NAME                            READY   STATUS    RESTARTS      AGE
+pod/accounts-6cd75cb994-7hvvv   1/1     Running   0             9m48s
+pod/db-0                        1/1     Running   0             9m48s
+pod/frontend-6cc86bcf58-gfxg4   1/1     Running   2 (91s ago)   9m48s
+pod/reports-5b46954c4f-75ps9    1/1     Running   0             9m48s
+
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/accounts   1/1     1            1           9m48s
+deployment.apps/frontend   1/1     1            1           9m48s
+deployment.apps/reports    1/1     1            1           9m48s
+
+NAME                 TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+service/accounts     ClusterIP      34.118.237.169   <none>        8000/TCP       9m48s
+service/db           ClusterIP      None             <none>        3306/TCP       13h
+service/frontend     LoadBalancer   34.118.237.26    <pending>     80:32394/TCP   9m48s
+service/kubernetes   ClusterIP      34.118.224.1     <none>        443/TCP        18h
+service/reports      ClusterIP      34.118.230.219   <none>        8000/TCP       9m48s
+```
+
+I then did the docker compose up -d
+
+
+
+Going to http\://34.129.49.41/ didn't show the app just hte ubuntu default page, going to 34.118.237.26 says site couldn't be reached, which makes snese cause no extenral ip. And adding the [http://34.129.49.41:8080](http://34.129.49.41:8080) does show up the frontend but idk if it's supposed to work without the external port routing
+
+#### Application
+I did not know how to actually access the application generated, turns out I had to wait for the service/frontend LoadBalancer to come up and then access it without the :8000 soecification at all. 
+
+It also suggested testing pod scalings with commands such as 
+```
+kubectl scale deployment reports --replicas=2
+kubectl get pods -l app=reports -o wide
+```
+It then suggested I start working on "I’d spend the next short block getting two reports replicas, readiness checks, and one replacement test working. Then implement the core website features; use their next image versions to demonstrate rollout/rollback"
+
+### Commands to test pods 
+Uh... i dont know if the readiness probs are within the scope of this project or not? I think I already have the kubernetes and scalability I guess with the replicas, not sure if there are certian commands I can run directl on the terminal to check the whole reliability if some of the nodes are down. I don't know if I should set then more replicas like 2 or 4 for reports because a user that is signed in might remain for longer and be posting more reports, and maybe 2 or 4 or 6 for frontend because ppl that are not signed in may still see the reports without making any themselves. But idk how to actually test the kubernetes itself works beyond seeing the pods?
+
+#### Application
+Recieved key commands to test pods with the full following output workflow
+"
+**Readiness probes aren’t explicitly required by your rubric.** They support reliability, but you can begin testing without them. The rubric asks you to demonstrate scaling **without disrupting the running application**, reliability when some containers/nodes are down, load balancing, and rollout/rollback—not just show that Pods exist. Marking Criteria_2026 (1)(1).pdf
+
+**Start with two replicas each for frontend, accounts, and reports; keep one database.** That’s enough to demonstrate redundancy. Six frontend replicas wouldn’t automatically earn more marks.
+
+Also, browsing regional reports calls the **reports API too**. Replica counts should eventually follow measured traffic/resource usage, rather than whether visitors are logged in. A logged-in user doesn’t reserve a Pod.
+
+### 1. Continuously check a real application request
+
+On your management VM, open a terminal and run:
+
+```bash
+# Repeatedly query regions through the public frontend and reports API.
+while true; do
+  curl --max-time 5 -sS -o /dev/null \
+    -w "HTTP %{http_code}\n" \
+    http://34.129.175.8/api/reports/regions
+  sleep 1
+done
+```
+
+Stop with **Ctrl+C** when finished.
+
+`HTTP 200` means the request succeeded. Other status codes or connection errors are evidence of disruption. This is a basic availability check, **not a capacity/load test**.
+
+### 2. Demonstrate scaling while requests continue
+
+In a second terminal:
+
+```bash
+# Increase the number of reports API Pods.
+kubectl scale deployment reports --replicas=3
+
+# Watch the new Pod start.
+kubectl get pods -l app=reports -o wide --watch
+```
+
+Press Ctrl+C to stop watching, then:
+
+```bash
+# Reduce the count while keeping two replicas.
+kubectl scale deployment reports --replicas=2
+```
+
+Watch whether the requests in terminal one continue succeeding. That demonstrates more than a screenshot of three Pods. [Official scaling command](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_scale/). [Kubernetes](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_scale/?utm_source=chatgpt.com)
+
+### 3. Demonstrate Pod replacement
+
+With **two reports Pods running**:
+
+```bash
+# Find their actual names and node placement.
+kubectl get pods -l app=reports -o wide
+```
+
+Copy **one** Pod’s name, then substitute it below:
+
+```bash
+# Delete one reports Pod; leave its other replica running.
+kubectl delete pod REPORTS_POD_NAME
+```
+
+```bash
+# Watch the Deployment create a replacement.
+kubectl get pods -l app=reports -o wide --watch
+```
+
+Your evidence is:
+
+- One reports Pod was removed.
+- Another replica continued serving requests.
+- Kubernetes created a replacement automatically.
+
+**Call this a controlled Pod-removal/recovery test**, not proof of surviving every possible crash. If requests fail, record that and investigate; don’t assume replica counts guarantee uninterrupted service.
+
+### 4. A node-maintenance test comes next
+
+First ensure frontend and accounts also have redundancy:
+
+```bash
+kubectl scale deployment frontend accounts --replicas=2
+kubectl get pods -o wide
+```
+
+**Different Pod IPs do not prove different nodes. Compare the `NODE` column.**
+
+For a controlled node test, choose a node **without `db-0`**, and ensure another frontend/API replica remains elsewhere. Then:
+
+```bash
+# Prevent new scheduling there and evict its eligible workloads.
+kubectl drain NODE_NAME --ignore-daemonsets --timeout=120s
+```
+
+Keep the request loop running and inspect replacement Pods. Afterwards:
+
+```bash
+# Allow scheduling on that node again.
+kubectl uncordon NODE_NAME
+```
+
+If drain reports a blocker, don’t add force flags blindly. This simulates **planned node maintenance**, not an abrupt VM failure. [Official drain documentation](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/). [Kubernetes](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/?utm_source=chatgpt.com)
+
+Your **single database remains a failure point**: taking down its node can interrupt database requests while storage and the Pod recover.
+
+For load balancing, multiple ready Service endpoints show the routing setup; demonstrating actual traffic distribution needs something observable, such as returning the responding Pod’s hostname from a health endpoint.
+
+**Do the scaling and single-Pod replacement tests first.** They’re small, meaningful checks you can complete now. Then add readiness probes before rehearsing rolling updates, and retain your final replica counts in the YAML so the next apply doesn’t reset them.
+"
+
+### Readiness probes
+I tried to add for mariadb and saw that "By default, (since 2023-06-27), official images will create healthcheck@localhost, healthcheck@127.0.0.1, healthcheck@::1 users with a random password and USAGE privileges. "  Anyway, do you suggest I add a readiness probe to the frontend or smth, i think that's the one with the load balancer that took the longest last time. I saw "If a container fails its liveness probe more times than the configured tolerance, the kubelet restarts that container. Liveness probes do not wait for readiness probes to succeed. If you want to wait before executing a liveness probe, you can either define initialDelaySeconds or use a startup probe."&#x20;
+
+I added both readiness and liveliness ports in the file to the DB, accounts, reports, frontend
+
+At env/port level for the accounts reports I did&#x20;
+\# Probing readiness w initial delay to let db star*t up first*\
+&#x20;         readinessProbe:\
+&#x20;           httpGet:\
+&#x20;             path: /api/reports/health\
+&#x20;             port: 8000\
+&#x20;           initialDelaySeconds: 10\
+&#x20;           periodSeconds: 5\
+&#x20;           timeoutSeconds: 2 \
+&#x20;           failureThreshold: 3\
+\
+&#x20;         \# Probe liveness on nginx port\
+&#x20;         \# Checks ready every five seconds w 2 second timeout, and max fails 3 times before getting purged and having a new one in its place\
+&#x20;         livenessProbe:\
+&#x20;           httpGet:\
+&#x20;             path: /api/reports/health\
+&#x20;             port: 8000\
+&#x20;           periodSeconds: 5\
+&#x20;           timeoutSeconds: 2 \
+&#x20;           failureThreshold: 3
+
+At the frontend I just made it with less intial time cause better to have something up first even if its emtpy right cause of the others still being down? added&#x20;
+added to kind: Deployment
+\# Probing readiness w initial delay to let db start up first\
+&#x20;         readinessProbe:\
+&#x20;           httpGet:\
+&#x20;             path: /\
+&#x20;             port: 80\
+&#x20;           initialDelaySeconds: 5\
+&#x20;           periodSeconds: 5\
+&#x20;           timeoutSeconds: 2 \
+&#x20;           failureThreshold: 3\
+\
+&#x20;         \# Probe liveness on nginx port\
+&#x20;         \# Checks ready every five seconds w 2 second timeout, and max fails 3 times before getting purged and having a new one in its place\
+&#x20;         livenessProbe:\
+&#x20;           httpGet:\
+&#x20;             path: /\
+&#x20;             port: 80\
+&#x20;           periodSeconds: 5\
+&#x20;           timeoutSeconds: 2 \
+&#x20;           failureThreshold: 3
+
+For the db, I did at StatefulSet level with more delay because it might take up longer for the db to start:&#x20;
+\# Checking readiness with a probe \
+&#x20;         \## First run startup (makes sure app succeeds, useful if app starts slow), readiness (eval app can accept traffic before routing), liveness (checks if app is deadlocked/unhealthy and restarts if fail)\
+&#x20;         readinessProbe:\
+&#x20;           exec: \
+&#x20;             command: \
+&#x20;               \- /healthcheck.sh\
+&#x20;               \- --readiness\
+&#x20;             initialDelaySeconds: 60\
+&#x20;             periodSeconds: 5\
+&#x20;         livenessProbe: \
+&#x20;           exec: \
+&#x20;             command: \
+&#x20;               \- //healthcheck.sh\
+&#x20;               \- --readiness\
+&#x20;             initialDelaySeconds: 60\
+&#x20;             periodSeconds: 5
+
+#### Application
+I read documentation regarding readiness probes, it corrected that probe delays don't establish startup orders, liveness restarts container not the whole pod. It also let me know I was doing my healthcheck wrong that I had found online to use instead ```healthcheck.sh --connect --innodb_initialized```, and it suggested readiness probe modifications
+```
+startupProbe:
+  exec:
+    command:
+      - healthcheck.sh
+      - --connect
+      - --innodb_initialized
+  periodSeconds: 5
+  timeoutSeconds: 5
+  failureThreshold: 60
+
+readinessProbe:
+  exec:
+    command:
+      - healthcheck.sh
+      - --connect
+      - --innodb_initialized
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+```
+
+### Rolling updates
+I tried this for the rolling updates
+# Added for rolling updates 
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0 # All originals stay up until a new one is ready to take its place 
+      maxSurge: 1 # One max extra pod created while prepping to replace old pod
+
+#### Application
+It let me know I should add it to the frontend, accounts and reprots deployments under specs at the same level as replicas and selector, and the following commands are useful to inspect rollout history.
+
+```
+# Wait for a frontend update to complete.
+kubectl rollout status deployment/frontend
+
+# Inspect its retained revisions.
+kubectl rollout history deployment/frontend
+
+# Restore the previous Pod-template revision.
+kubectl rollout undo deployment/frontend
+
+# Verify that restoration completes.
+kubectl rollout status deployment/frontend
+```
+
+## Website functionalities
+### Login
+Okay my time to give up and ask you... I found a base for a making user registration with hashes and stuff, not sure how to do it though.&#x20;
+```
+from flask import Flask, request, jsonify, session
+from flask_sqlalchemy import SQLAlchemy
+from flask_bcrypt import Bcrypt
+from flask_cors import CORS 
+
+app = Flask(__name__)
+
+# User Model
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), unique=True, nullable=False)
+    # created_at = db.Column(db.String(128), nullable=False)
+
+# Basic health check
+@app.get("/api/accounts/health")
+def health():
+    return {
+        "service": "accounts",
+        "status": "running",
+    }
+
+# Create account
+@app.get("/api/accounts/register", methods=["POST"])
+def signup():
+    # Paramters recieved through the post
+    username = request.json["username"]
+    password = request.json["password"]
+ 
+    # Check if this person is already registered
+    user_exists = User.query.filter_by(username=username).first() is not None
+ 
+    # Protection against repeated people
+    if user_exists:
+        return jsonify({"error": "This user already exists"}), 409
+     
+    # Hash the password from the posted one
+    hashed_password = bcrypt.generate_password_hash(password)
+    new_user = User(username=username, password_hash=hashed_password, ) # Make it register people 
+    db.session.add(new_user) # Should add the created_at automatically when inserting it
+    db.session.commit()
+ 
+    # Sets session to the user id that was generated, see how I can reuse it across the app
+    session["user_id"] = new_user.id
+ 
+    # Returns the id and username that was added
+    return jsonify({
+        "id": new_user.id,
+        "username": new_user.username
+    })
+    
+```
+
+Now i wanna make the create account, but im confused as to how I can do the post for the login stuff:&#x20;
+```
+import { useState } from 'react'
+import {useNavigate} from "react-router-dom";
+import axios from 'axios';
+
+
+function CreateAccount() {
+    // const [loading, setLoading] = useState(false);
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    //const [error, setError] = useState('');
+    //const navigate = useNavigate();
+    //const [user, setUser] = useState<any>(null);
+    const [errorMessage, setErrorMessage] = useState(''); //, setErrorMessage] = useState('');
+    const navigate = useNavigate();
+
+    async function registerUser() {
+          try {
+            const response = await fetch('/api/accounts/register');
+    
+            // Error loadign region
+            if (!response.ok) {
+              throw new Error(`Could not reports (${response.status})`);
+            }
+    
+            // Posts the info
+            // const data: Region[] = await response.json();
+    
+            if (!ignore) {
+              // Tries to establish the regions that should have been obtained 
+              setRegions(data);
+            }
+          } catch (error) {
+            if (!ignore) {
+              // So it did get the request but could not set them 
+              setError(error instanceof Error ? error.message : 'Could not reports');
+            }
+          } finally {
+            // Did work, so finished loading 
+            if (!ignore) {
+              setLoading(false);
+            }
+          }
+        }
+    
+        // Calll funct to load regions 
+        loadRegions();
+    
+        return () => {
+          ignore = true;
+        };
+      }, []);
+     
+    // Register a user 
+    const handleCLick = () => {
+        axios.post('http://127.0.0.1:5000/signup', {
+            email: email,
+            password: password
+        })
+        .then(function (response) {
+             console.log(response);
+            navigate("/");
+        })
+        .catch(function (error) {
+            console.log(error, 'error');
+            if (error.response.status === 401) {
+                alert("Invalid credentials");
+            }
+        });
+    };
+
+    // Functions
+    const handleClick = () => {
+        console.log('User trying to register');
+    };
+
+    return (
+        <div className="flex items-center justify-center overflow-hidden">
+            {/* Centered login card */}
+            <div className="relative flex flex-col items-center w-full max-w-sm px-8 py-10">
+
+                <h1 className="text-2xl font-bold text-center mb-1">Register</h1>
+                <p className="text-gray-600 text-center mb-6">Join and help submit reports for your fellow riders!</p>
+
+                {/* Capture data, first email/username */}
+                <div className="flex flex-col gap-4 w-full">
+                    <div className="flex flex-col gap-1">
+                        <label>Username</label>
+                        <input
+                            type="username"
+                            placeholder="Enter your username"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            required
+                            className="h-11 px-4 bg-gray-100 rounded-2xl text-zinc-600 focus:outline-2"
+                        />
+                    </div>
+
+                    {/* Password */}
+                    <div className="flex flex-col gap-1">
+                        <label>Password</label>
+                        <input
+                            type="password"
+                            placeholder="Create new password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            className="h-11 px-4 bg-gray-100 rounded-2xl text-zinc-600 focus:outline-2"
+                        />
+                    </div>
+
+                    <button
+                        onClick={handleClick}
+                        className="text-white font-bold bg-blue-400 hover:bg-blue-700 py-2 px-4 rounded-2xl"
+                    >Create Account</button>
+                </div>
+
+                {/* Error display or go login or home */}
+                {errorMessage && <p className="text-center rounded-lg bg-red-100 text-red-800 outline-2 outline-red-800 mt-5 mb-1 px-2 py-3">{errorMessage}</p>}
+                <div className="flex flex-col text-center items-center gap-2.5 mt-15 col-1">
+                    <p className="text-black font-semibold">Already have an account?</p>
+                    <a href="/login" className="text-blue-400 hover:text-blue-700 font-semibold underline">Log in</a>
+                    <a href="/" className="text-zinc-600 underline hover:text-blue-700 mt-5">Return Home</a>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default CreateAccount
+```
+
+#### Application
+It told me to "Replace the SQLAlchemy model and registration attempt with this in backend/api-accounts/app.py. Keep your health route."
+and suggested the following file that I then compared against mine
+```python
+import pymysql
+from flask import Flask, request
+from werkzeug.security import generate_password_hash
+
+from db import get_connection
+
+app = Flask(__name__)
+
+
+@app.get("/api/accounts/health")
+def health():
+    return {"service": "accounts", "status": "running"}
+
+
+@app.post("/api/accounts/register")
+def register():
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return {"error": "Expected username and password as JSON"}, 400
+
+    username = data.get("username")
+    password = data.get("password")
+
+    if not isinstance(username, str) or not isinstance(password, str):
+        return {"error": "Username and password are required"}, 400
+
+    username = username.strip()
+
+    if not username or len(username) > 50:
+        return {"error": "Username must contain 1–50 characters"}, 400
+
+    if not password or len(password) > 256:
+        return {"error": "Password must contain 1–256 characters"}, 400
+
+    password_hash = generate_password_hash(password)
+    connection = None
+
+    try:
+        connection = get_connection()
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO users (username, password_hash)
+                VALUES (%s, %s)
+                """,
+                (username, password_hash),
+            )
+            user_id = cursor.lastrowid
+
+        connection.commit()
+
+        return {"id": user_id, "username": username}, 201
+
+    except pymysql.IntegrityError as error:
+        if connection is not None:
+            connection.rollback()
+
+        if error.args[0] == 1062:
+            return {"error": "This username already exists"}, 409
+
+        app.logger.exception("Registration failed")
+        return {"error": "Could not create account"}, 500
+
+    except pymysql.MySQLError:
+        if connection is not None:
+            connection.rollback()
+
+        app.logger.exception("Registration database error")
+        return {"error": "Database temporarily unavailable"}, 503
+
+    finally:
+        if connection is not None:
+            connection.close()
+```
+It also gave me a base for the post endoint, which I had not used before
+```jsx
+async function handleClick() {
+    setErrorMessage('');
+    setLoading(true);
+
+    try {
+        const response = await fetch('/api/accounts/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username,
+                password,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Could not create account');
+        }
+
+        navigate('/login');
+    } catch (error) {
+        setErrorMessage(
+            error instanceof Error
+                ? error.message
+                : 'Could not create account'
+        );
+    } finally {
+        setLoading(false);
+    }
+}
+```
+
+It told me to "Delete the Axios code, registerUser, loadRegions, ignore, and the duplicate click handlers. Registration happens on a button click, not inside a mounting effect" and also suggested changing the input field type="username" to type="text".
+
+It told me to test it with command ```docker compose up -d --build accounts reports db``` and then ```npm run dev``` for the frontend. 
+
 #### Session
-It also helped implement sessions with command ```bash python3 -c "import secrets; print(secrets.token_hex(32))"```
+Okay, now I tried to add login stuff, I need help because it is not currently letting me access the database neither at home or login:&#x20;
+
+frontend % npm run dev\
+\
+\> frontend@0.0.0 dev\
+\> vite\
+\
+\
+&#x20; VITE v8.3.4  ready in 311 ms\
+\
+&#x20; ➜  Local:   http\://localhost:5173/\
+&#x20; ➜  Network: use --host to expose\
+&#x20; ➜  press h + enter to show help\
+10:44:00 AM [vite] http proxy error: /api/reports/regions\
+Error: connect ECONNREFUSED 127.0.0.1:5002\
+&#x20;   at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)\
+10:44:00 AM [vite] http proxy error: /api/reports/regions\
+Error: connect ECONNREFUSED 127.0.0.1:5002\
+&#x20;   at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) (x2)\
+10:44:08 AM [vite] http proxy error: /api/accounts/login\
+Error: connect ECONNREFUSED 127.0.0.1:5001\
+&#x20;   at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)\
+10:44:40 AM [vite] http proxy error: /api/accounts/login\
+Error: connect ECONNREFUSED 127.0.0.1:5001\
+&#x20;   at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) (x2)\
+10:44:58 AM [vite] http proxy error: /api/reports/regions\
+Error: connect ECONNREFUSED 127.0.0.1:5002\
+&#x20;   at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)\
+10:44:58 AM [vite] http proxy error: /api/reports/regions\
+Error: connect ECONNREFUSED 127.0.0.1:5002\
+&#x20;   at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) (x2)
+
+
+
+Also, I know a post is more safe, so I want your feeddback on the routes and login, and I would like to know how to implement a simple session with this work:&#x20;
+```
+# Login as a post to protect security
+@app.post("/api/accounts/login")
+def login():
+    data = request.get_json(silent=True)
+
+    # Badly structured gives an error
+    if not isinstance(data, dict):
+        return {"error": "Expected username and password as JSON"}, 400
+
+    # POST with username and pwd
+    username = data.get("username")
+    password = data.get("password")
+
+    # One of them is empty 
+    if not isinstance(username, str) or not isinstance(password, str):
+        return {"error": "Username and password are required"}, 400
+
+    # Remove any spaces and such from it
+    username = username.strip()
+    
+    if not username and not password: 
+        return {"error": "Please enter a username and password"}
+    
+    # Keep within database limits 
+    if not username or len(username) > 50:
+        return {"error": "Username must be less than 50 characters"}, 400
+
+    # Keep within password limits
+    if not password or len(password) > 256:
+        return {"error": "Password must be between 1–256 characters"}, 400
+
+    # Create a hash from the password
+    password_hash = generate_password_hash(password)
+    connection = None
+
+    # Establish connection 
+    try:
+        connection = get_connection()
+        
+        # SQL query to execute, and extract id that was just generated with %s to pass the strings, sets as dictionary to extract rows more easily
+        with connection.cursor() as cursor(dictionary=True):
+            cursor.execute(
+                """
+                SELECT id, password_hash FROM users WHERE username = %s
+                """,
+                (username),
+            )
+            user = cursor.fetchone() # Extracts the id
+
+        # Close cursor
+        cursor.close()
+        
+        # Verify the user and password matches
+        if user and check_password_hash(user['password_hash'], password): 
+            # Pwd match, log the user in
+            return {"id": user_id, "username": username}, 201
+
+        else: 
+            return {"error": "Incorrect credentials"}, 400
+
+    # Something failed
+    except pymysql.MySQLError:
+        if connection is not None:
+            connection.rollback()
+
+        app.logger.exception("Registration database error")
+        return {"error": "Database temporarily unavailable, please try again later"}, 503
+
+    # Once done, closes the connection
+    finally:
+        if connection is not None:
+            connection.close()
+```
+
+
+
+Function to log in:&#x20;
+```
+async function handleLogin() {
+        // Base field checks
+        console.log("Handle the click");
+        setErrorMessage('');
+
+        if(username.length === 0 && password.length === 0) {
+            setErrorMessage("Please enter a username and password")
+        }
+        else if(username.length === 0) {
+          setErrorMessage("Please enter a username");
+        }
+        else if(password.length === 0) {
+          setErrorMessage("Please enter a password");
+        }
+        else {
+            // Shows that it is going to load
+            setLoading(true);
+
+            // Sends the query 
+            try {
+                const response = await fetch('/api/accounts/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password,
+                    }),
+                });
+
+                // Waits to see what endpoint says
+                const data = await response.json();
+
+                // Something died
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not log in');
+                }
+
+                console.log('Logged in user');
+                navigate('/'); // Successful, takes them home with session
+            } catch (error) {
+                setErrorMessage(
+                    error instanceof Error
+                        ? error.message
+                        : 'Could not log user in'
+                );
+            } finally {
+                setLoading(false);
+            }
+        }
+    }
+```
+
+#### Application
+It helped implement sessions with command ```bash python3 -c "import secrets; print(secrets.token_hex(32))"``` that I shoud establish in SECRET_KEY=paste_the_generated_value_here, and add to the compose enviornment ``` SECRET_KEY: ${SECRET_KEY}```, and corrections to API call. 
+
+Since I was adding sessions, it told me to add the following block
+```python
+app.config.update(
+    SECRET_KEY=os.environ["SECRET_KEY"],
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=False,
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
+)
+```
+And key corrections to my function that I compared agaisnt the helper it gave me–but did not replace it with the one they gave me so that I read and understood what was happening. 
+
+```python
+@app.post("/api/accounts/login")
+def login():
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return {"error": "Expected username and password as JSON"}, 400
+
+    username = data.get("username")
+    password = data.get("password")
+
+    if not isinstance(username, str) or not isinstance(password, str):
+        return {"error": "Username and password are required"}, 400
+
+    username = username.strip()
+
+    if not username or not password:
+        return {"error": "Please enter a username and password"}, 400
+
+    if len(username) > 50 or len(password) > 256:
+        return {"error": "Invalid username or password length"}, 400
+
+    connection = None
+
+    try:
+        connection = get_connection()
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, username, password_hash
+                FROM users
+                WHERE username = %s
+                """,
+                (username,),
+            )
+            user = cursor.fetchone()
+
+        if user is None or not check_password_hash(
+            user["password_hash"], password
+        ):
+            return {"error": "Incorrect username or password"}, 401
+
+        # Replace any previous session after successful authentication.
+        session.clear()
+        session.permanent = True
+        session["user_id"] = user["id"]
+        session["username"] = user["username"]
+
+        return {
+            "id": user["id"],
+            "username": user["username"],
+        }, 200
+
+    except pymysql.MySQLError:
+        app.logger.exception("Login database error")
+        return {"error": "Database temporarily unavailable"}, 503
+
+    finally:
+        if connection is not None:
+            connection.close()
+```
+
+It also provided a base endpoint to check if the user has an active session, which I later reflected in the frontend by retrieving the username via the established session or did not show their name if they had no session. 
+```python
+@app.get("/api/accounts/me")
+def current_user():
+    if "user_id" not in session:
+        return {"error": "Not logged in"}, 401
+
+    return {
+        "id": session["user_id"],
+        "username": session["username"],
+    }, 200
+```
+### Correcting make reports login based on session
+Modified now to get the user session so that I can block or unblick the make a report if they are not logged in: 
+// When page loads, it should get all of the reports
+  useEffect(() => {
+    // Checks if user is logged in to see if lets them access stuff or not
+    useEffect(() => {
+      async function getSession() {
+        try {
+          const response = await fetch('/api/accounts/session');
+
+          if (!response.ok) {
+            throw new Error(`Could not fetch session (${response.status})`);
+          }
+
+          // Gets result of session
+          const checkSession = await response.json();
+
+          // There is something defined
+          if (checkSession["username"]) {
+            // Checks the results of the session
+            setUsername(checkSession["username"]);
+            setLoggedIn(true);
+          } else {
+            setUsername('');
+            setLoggedIn(false);
+          }
+        }
+        catch (error) {
+          if (!ignore) {
+            // So it did get the request but could not set them 
+            setError(error instanceof Error ? error.message : 'Could not check if user is logged in');
+          }
+        } 
+      }
+    })
+
+    let ignore = false;
+
+    // Uses here the flask api route to fetch the region reports
+    async function loadRegions() {
+      try {
+        const response = await fetch('/api/reports/regions');
+
+        // Error loadign region
+        if (!response.ok) {
+          throw new Error(`Could not load reports (${response.status})`);
+        }
+
+        // Recieves data 
+        const data: Region[] = await response.json();
+
+        if (!ignore) {
+          // Tries to establish the regions that should have been obtained 
+          setRegions(data);
+        }
+      } catch (error) {
+        if (!ignore) {
+          // So it did get the request but could not set them 
+          setError(error instanceof Error ? error.message : 'Could not reports');
+        }
+      } finally {
+        // Did work, so finished loading 
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+
+    // Call to get login status
+    getSession();
+
+    // Calll funct to load regions 
+    loadRegions();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+And right now just showing a small p under the title of the page that just says {loggedIn ? <p>Welcome back {username}!</p> : <p>Log in to make reports!</p>}
+
+#### Application
+It said that my nested useEffect was not working, so I should keep it as a separate function and it added the disabling as just disabled={!loggedIn}
+
+### Providing secret key to kubernetes 1
+Wait the secret key I only added it to the root .env, and then updated the docker-compose to include it. I did not modify the kubernetes.yaml
+
+# Accounts service
+  accounts:
+    image: cloudroad-accounts:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        API_SERVICE: api-accounts
+    environment:
+      # Database 
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # Password hash with Flask built-in session
+      SECRET_KEY: ${SECRET_KEY}
+
+I just pulled the github, and added the SECRET_KEY generated on my mac to the .env in root directory. kubernetes.yaml I already changed it (currently v1, I want v2 to be the new login stuff I added just in frontend and accounts) and it is reflected on my github on my computer
+
+### Providing key to kubernetes 2
+Is there a way I can create the secret more persistent, like a .sh file I can run like in the cca2 example: 
+```
+#!/usr/bin/env bash
+# PROVIDED helper - not assessed and should not be submitted.
+set -euo pipefail
+
+TOKEN="${1:-$(python3 - <<'PY'
+import secrets
+print(secrets.token_urlsafe(24))
+PY
+)}"
+
+kubectl create secret generic jupyter-secret \
+  --from-literal=JUPYTER_TOKEN="$TOKEN" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+echo
+echo "Jupyter token created. Keep this token private while your cluster is running:"
+echo "$TOKEN"
+echo
+echo "After jupyter-service receives an EXTERNAL-IP, browse to:"
+echo "  http://EXTERNAL_IP:8080/lab?token=$TOKEN"
+```
+Or yeah just to generate it and then i can set it manually in the env even if its different from local develoopment?
+
+#### Application
+It did provide a template that I read but did copy-paste to save time investigating the commands, 
+```
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Check whether the Secret already exists in the default namespace.
+EXISTING_SECRET=$(kubectl get secret road-session-secret \
+  --namespace=default \
+  --ignore-not-found \
+  -o name)
+
+# Preserve the existing key when rerunning this script.
+if [[ -n "$EXISTING_SECRET" ]]; then
+  echo "Session Secret already exists; keeping its current key."
+  exit 0
+fi
+
+# Generate a cloud-specific signing key.
+SESSION_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+
+# Create the Kubernetes Secret without printing its value.
+kubectl create secret generic road-session-secret \
+  --namespace=default \
+  --from-literal=SECRET_KEY="$SESSION_KEY"
+
+unset SESSION_KEY
+
+echo "Session Secret created."
+```
+
+This one I just modified it to change the echos a bit. 
+
+It specified that I should run it with ```bash k8s/setup_session_secret.sh``` and I should add a block to the yaml specifying 
+```
+- name: SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: road-session-secret
+      key: SECRET_KEY
+```
+
+## Working with navigation bar to change based on user being logged in or out
+my navbar isnt working now: 
+//import { useLocation, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate } from "react-router-dom";
+
+function Navbar() {
+    const [loggedIn, setLoggedIn] = useState(false);
+    const [loggingOut, setLoggingOut] = useState(false);
+    const navigate = useNavigate();
+
+    // Checks if user is logged in to see if lets them access stuff or not
+    useEffect(() => {
+        let ignore = false;
+
+        async function getSession() {
+            try {
+                const response = await fetch('/api/accounts/session');
+                
+                // Gets result of session
+                const checkSession = await response.json();
+
+                // Not logged in might be normal, just checks and exits
+                if (response.status === 401) {
+                    if (!ignore) {
+                        setLoggedIn(false);
+                    }
+                    return;
+                }
+
+                if (!ignore) {
+                    setLoggedIn(Boolean(checkSession.username));
+                }
+
+                if (!response.ok) {
+                    throw new Error(Could not log out (${response.status}));
+                }
+
+                // There is something defined
+                setLoggedIn(false);
+                setLoggingOut(false);
+            }
+            catch (error) {
+                if (!ignore) {
+                    // So it did get the request but could not set them 
+                    console.log("Navbar could not establish session");
+                }
+            }
+        }
+
+        // Call function itself
+        getSession();
+
+        return () => {
+            ignore = true;
+        };
+    }, [])
+
+    async function logOut() {
+        setLoggingOut(true);
+
+        try {
+            // AI suggestion include the credentials to check the session
+            const response = await fetch('/logout', {
+                method: 'GET',
+                credentials: 'include',
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Could not log out');
+            }
+
+            setLoggedIn(false);
+            navigate('/');
+        } catch (error) {
+            console.error('Error logging out:', error);
+        } finally {
+            setLoggingOut(false);
+        }
+    }
+
+    return (
+        <div>
+            <nav className="flex justify-between items-center h-16 font-semibold bg-blue-200 p-6 px-10">
+
+                <a href="/" className="text-gray-700 hover:text-blue-600 transition-colors">Home</a>
+                {!loggedIn ?
+                    <div className="flex justify-right">
+                        <a href="/login" className="mr-6">Login</a>
+                        <a href="/register">Register</a>
+                    </div>
+                    :
+                    <div>
+                        <button
+                            type="button"
+                            onClick={logOut}
+                            disabled={loggingOut}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
+                        >
+                            {loggingOut ? 'Logging Out...' : 'Log Out'}
+                        </button>
+                    </div>
+                }
+            </nav>
+
+        </div>
+    )
+}
+
+export default Navbar
+
+#### Application
+It provided the following insights, which I read and modified accordingly: 
+"
+**Three things are causing this:**
+
+1. After detecting a valid session, you immediately call **`setLoggedIn(false)`** again.
+2. Your logout request uses **`GET /logout`**, but our Flask route was **`POST /api/accounts/logout`**.
+3. The navbar stays mounted during navigation, so an effect with `[]` won’t recheck after logging in.
+
+Use `useLocation` to recheck when the page changes:
+
+```tsx
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+```
+
+Inside `Navbar`, add:
+
+```tsx
+const location = useLocation();
+```
+
+Replace your effect with:
+
+```tsx
+useEffect(() => {
+    let ignore = false;
+
+    async function getSession() {
+        try {
+            const response = await fetch('/api/accounts/session');
+
+            if (response.status === 401) {
+                if (!ignore) setLoggedIn(false);
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error(`Could not check session (${response.status})`);
+            }
+
+            const data = await response.json();
+
+            if (!ignore) {
+                setLoggedIn(Boolean(data.username));
+            }
+        } catch (error) {
+            if (!ignore) {
+                setLoggedIn(false);
+                console.error('Navbar could not establish session:', error);
+            }
+        }
+    }
+
+    getSession();
+
+    return () => {
+        ignore = true;
+    };
+}, [location.pathname]);
+```
+
+Then replace `logOut` with:
+
+```tsx
+async function logOut() {
+    setLoggingOut(true);
+
+    try {
+        const response = await fetch('/api/accounts/logout', {
+            method: 'POST',
+        });
+
+        if (!response.ok) {
+            throw new Error(`Could not log out (${response.status})`);
+        }
+
+        setLoggedIn(false);
+        navigate('/');
+    } catch (error) {
+        console.error('Error logging out:', error);
+    } finally {
+        setLoggingOut(false);
+    }
+}
+```
+
+**Keep your existing JSX.** These changes assume Flask defines:
+
+```python
+@app.get("/api/accounts/session")
+```
+
+and:
+
+```python
+@app.post("/api/accounts/logout")
+```
+
+If your backend uses different paths, match those exactly. Since these are same-origin requests through Vite/Nginx, cookies are sent by default; `credentials: 'include'` isn’t necessary here.
+"
+
+### Re-rendering home with logout
+the issue now is that it doesn't refresh the page, like the sign out button does change back to navbar statusbut home stays displaying the persons name and enabled button
+
+#### Application
+It suggested to useLocation and change navigate to 
+```jsx
+setLoggedIn(false);
+window.location.replace('/');
+```
+that way, it would detect when the rendeing was changed to home from the navbar and regenerate the window.
 
 # Sources
 https://blog.miguelgrinberg.com/post/how-to-dockerize-a-react-flask-project Dockerizing a Flask + React project 
