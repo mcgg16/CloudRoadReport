@@ -3219,8 +3219,505 @@ It also suggested I add to kubernetes env
       key: SECRET_KEY
 ```
 
-### 
+### Reports dropdown
+I want to make a dropdown to get the regions first with the endpoint to get regions and conditions that I made: 
+```python
+# Get information from db for pop-ups
+## Get conditions to display in dropdown
+@app.get("api/reports/conditions")
+def get_conditions(): 
+    try:
+        connection = get_connection()
 
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT id, name, description FROM conditions ORDER BY id"
+                )
+                conditions = cursor.fetchall()
+        finally:
+            connection.close()
+
+        return jsonify(conditions)
+
+    except pymysql.MySQLError:
+        app.logger.exception("Could not retrieve regions")
+        return {"error": "Database temporarily unavailable"}, 503
+    return
+
+## Get region id and name
+@app.get("api/reports/names")
+def get_region_names():
+    try:
+        connection = get_connection()
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT id, name FROM regions ORDER BY id"
+                )
+                names = cursor.fetchall()
+        finally:
+            connection.close()
+
+        return jsonify(names)
+
+    except pymysql.MySQLError:
+        app.logger.exception("Could not retrieve region names")
+        return {"error": "Database temporarily unavailable"}, 503
+```
+
+Web: 
+const [regions, setRegions] = useState<Names[]>([]); // Stores the regions for dropdown
+
+// Get regions
+    useEffect(() => {
+        let ignore = false;
+
+        // Uses here the flask api route to fetch the region reports
+        async function loadRegionNames() {
+            try {
+                const response = await fetch('/api/reports/names');
+
+                // Error loadign region
+                if (!response.ok) {
+                    throw new Error(`Could not load region names (${response.status})`);
+                }
+
+                // Recieves data 
+                const data: Names[] = await response.json();
+
+                if (!ignore) {
+                    // Tries to establish the regions that should have been obtained 
+                    setRegions(data);
+                }
+            } catch (error) {
+                if (!ignore) {
+                    // So it did get the request but could not set them 
+                    console.log('Could not get region names');
+                }
+            } finally {
+                // Did work, so finished loading 
+                if (!ignore) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        // Calll funct to load regions 
+        loadRegionNames();
+
+        return () => {
+            ignore = true;
+        };
+    }, []);
+
+#### Application
+It let me know I was missing the leading / from the API endpoints, and provided this template for the dropdown because I saw too many implemnetations for it and honestly wanted to save time from the frontend. 
+
+```jsx
+<label htmlFor="region">Region</label>
+
+<select
+    id="region"
+    value={regionId}
+    onChange={(e) => setRegionId(e.target.value)}
+    required
+    className="h-11 px-4 bg-gray-100 rounded-2xl"
+>
+    <option value="" disabled>Select a region</option>
+
+    {regions.map((region) => (
+        <option key={region.id} value={region.id}>
+            {region.name}
+        </option>
+    ))}
+</select>
+```
+
+Here I did omit the region, but used the mapping and base logic provided. I then used this as a base to fetch the road conditions, and used external sources to help create a family of buttons to render the road conditions and descriptions. 
+
+### Modify prvious region endpoint with information divided by region
+I want to make it now so that I can modify the regions endpoint to now fetch the data with a json returning reigion id, name,  last 10 mins number of reports per category, last hour reports per category, last 12 hours reports per category. I have a bit of a base, not sure if this is actually how it works or if I should maek another script as a function or smth... like I wanna be oh its south bank, bam here are the counts of dry damp wet standign water in these time intervals, so that way when home loads i can do an admittedly very big fetch and get all of the last info that the users can see even if they aren't logged in. but yeah idk how to make the logic, it's almost 3 am and I am very tired.&#x20;
+
+
+```
+# Get region reports 
+@app.get("/api/reports/regions")
+def get_regions():
+    try:
+        connection = get_connection()
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "
+                    SELECT 
+                        id, 
+                        name 
+                    -- Count within last 10 mins
+                    COUNT(
+                        CASE 
+                            WHEN observed_at >= currentTime - 10 mins
+                            THEN 1
+                        END
+                    ) AS reports_10_mins
+                    -- Count last hour 
+                    COUNT (
+                        CASE 
+                            WHEN observed_at >= currentTime - 1 hour
+                            THEN 1
+                        END
+                    ) AS reports_1_hour
+                    -- Count last 12 hours 
+                    COUNT (
+                        CASE
+                            WHEN observedAt >= currentTime - 12 hours
+                            THEN 1
+                        END
+                    )
+                    FROM regions
+                    LEFT JOIN reports ON reports.region_id =regions.id
+                    GROUP BY regions.id;
+                    "
+                )
+                regions = cursor.fetchall()
+        finally:
+            connection.close()
+
+        return jsonify(regions)
+
+    except pymysql.MySQLError:
+        app.logger.exception("Could not retrieve regions")
+        return {"error": "Database temporarily unavailable"}, 503
+```
+
+Worth notingtho, mariaDB is storing time in the past for me now by 8 hours even tho I had tried to establish times differently in the frontend.&#x20;
+
+
+
+MariaDB
+
+\> SELECT \* FROM reports;\
++----+---------------------+---------------------+---------+--------------+-----------+\
+\| id | observed_at         | submitted_at        | user_id | condition_id | region_id |\
++----+---------------------+---------------------+---------+--------------+-----------+\
+\|  1 | 2026-10-20 16:41:00 | 2026-10-20 16:41:14 |
+
+
+
+Frontend how I save reports and backend&#x20;
+```
+// Gets current time for report, generated by AI to use brisbane time zones
+    function getCurrentTime() {
+        // Sets timezone to australia and applies formatting
+        const parts = new Intl.DateTimeFormat('en-AU', {
+            timeZone: 'Australia/Brisbane',
+            hour: '2-digit',
+            minute: '2-digit',
+            hourCycle: 'h23',
+        }).formatToParts(new Date());
+
+        const hour = parts.find((part) => part.type === 'hour')?.value ?? '00';
+        const minute = parts.find((part) => part.type === 'minute')?.value ?? '00';
+
+        return `${hour}:${minute}`;
+    }
+
+    const [observeTime, setObserveTime] = useState(getCurrentTime);
+
+// Submit the report 
+    async function submitReport() {
+        console.log("Handle the click");
+        setErrorMessage('');
+
+        // Check information 
+        if (regionId === '') {
+            // No region selected
+            setErrorMessage("Please select a region")
+        }
+        else if (observeTime > getCurrentTime()) {
+            // Selecting time in the future 
+            setErrorMessage("Cannot set observation to a future time");
+        } else {
+            // Shows that it is going to load
+            setLoading(true);
+
+            // Sends the query 
+            try {
+                // AI correction asking for revision for window reloading it let me know that I needed to assign regionId as Number(regionId)
+                const response = await fetch('/api/reports/make', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        observeTime,
+                        conditionId,
+                        regionId: Number(regionId),
+                    }),
+                });
+
+                // Waits to see what endpoint says
+                const data = await response.json();
+
+                // Something died
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not create report');
+                }
+
+                console.log('Created report');
+                open = false; // Sets to false to close pop-up if it was succesful
+                window.location.assign('/');// AI suggestion, I had navigate('/') but apparently this is better to full reload the home page; prompt "instead of navigate i want to make it so that it uses location to detect that a new report was submitted and "force reload" home... and id appreciate a revision... but keep it as simple as possible with minor code changes"
+            } catch (error) {
+                console.log('Error ', error);
+                setErrorMessage('Could not make report, please try again later');
+            } finally {
+                setLoading(false);
+            }
+        }
+    }
+```
+
+
+```
+def make_report(): 
+    user_id = session.get("user_id") # Extract id from the saved session
+    
+    if user_id is None: 
+        return  {"error": "Log in to make a report"}, 401
+    
+    # Does have sesh, can make request
+    data = request.get_json(silent=True)
+
+    # Badly structured gives an error
+    if not isinstance(data, dict):
+        return {"error": "Expected report as JSON"}, 400
+
+    # POST with report info
+    observed_at = data.get("observeTime") # May differ from default wheras submitted_at does adhere perfectly
+    condition_id = data.get("conditionId")
+    region_id = data.get("regionId")
+    
+    if not isinstance(observed_at, str) or not observed_at:
+        return {"error": "Observation time is required"}, 400
+
+    if type(condition_id) is not int or condition_id <= 0:
+        return {"error": "Select a valid condition"}, 400
+
+    if type(region_id) is not int or region_id <= 0:
+        return {"error": "Select a valid region"}, 400
+
+    try:
+        brisbane_now = datetime.now(ZoneInfo("Australia/Brisbane"))
+
+        observation = datetime.strptime(observed_at, "%H:%M").replace(
+            year=brisbane_now.year,
+            month=brisbane_now.month,
+            day=brisbane_now.day,
+            tzinfo=ZoneInfo("Australia/Brisbane"),
+        )
+
+        if observation > brisbane_now:
+            return {"error": "Observation time cannot be in the future"}, 400
+
+        # Store as UTC because your database connection uses UTC.
+        observation = observation.astimezone(timezone.utc).replace(tzinfo=None)
+
+    except ValueError:
+        return {"error": "Invalid observation time"}, 400
+        
+    # Get rid of timezone info, AI suggestion
+    observation = observation.replace(tzinfo=None)
+    connection = None
+    
+    # Establish connection to make the post
+    try:
+        connection = get_connection()
+        
+        # SQL query to execute, and extract id that was just generated with %s to pass the strings
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO reports (observed_at, user_id, condition_id, region_id)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (observation, user_id, condition_id, region_id),
+            )
+            id = cursor.lastrowid
+
+        # All went smoothly, 
+        connection.commit()
+
+        # For error logging
+        return {"id": id, "user_id": user_id, "region_id": region_id, "condition_id": condition_id}, 201
+
+    # Got SQL error referencing key dne
+    except pymysql.IntegrityError as error:
+        if connection is not None:
+            connection.rollback()
+
+        if error.args[0] == 1452:
+            return {"error": "Foreign key does not exist"}, 400
+
+        return {"error": "Could not create report"}, 500
+
+    # DB down
+    except pymysql.MySQLError:
+        if connection is not None:
+            connection.rollback()
+
+        return {"error": "Database temporarily unavailable"}, 503
+
+    # Once done, closes the connection
+    finally:
+        if connection is not None:
+            connection.close()
+```
+
+#### Application
+Honestly, a lot of my base implementation was wrong and I left in pseudocode in it as well to get its suggestions to structure the JSON. It suggested the following structure which I read and verified, such that now the query obtains the reports within the specified time period for each condition and then packages it neatly into a JSON whivh was very useful because I did not know how to implement something like this and was debeting wheter usign the base logic provided and calling the query four times per road condition and passing those foru lists to generate a RegionCard table with the information. 
+
+```python
+with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    r.id AS region_id,
+                    r.name AS region_name,
+                    c.id AS condition_id,
+                    c.name AS condition_name,
+
+                    COUNT(
+                        CASE
+                            WHEN p.observed_at >= NOW() - INTERVAL 10 MINUTE
+                            THEN p.id
+                        END
+                    ) AS reports_10_minutes,
+
+                    COUNT(
+                        CASE
+                            WHEN p.observed_at >= NOW() - INTERVAL 1 HOUR
+                            THEN p.id
+                        END
+                    ) AS reports_1_hour,
+
+                    COUNT(p.id) AS reports_12_hours
+
+                FROM regions AS r
+
+                CROSS JOIN conditions AS c
+
+                LEFT JOIN reports AS p
+                    ON p.region_id = r.id
+                    AND p.condition_id = c.id
+                    AND p.observed_at >= NOW() - INTERVAL 12 HOUR
+                    AND p.observed_at <= NOW()
+
+                GROUP BY r.id, r.name, c.id, c.name
+                ORDER BY r.id, c.id
+                """
+            )
+            rows = cursor.fetchall()
+
+        regions = {}
+
+        for row in rows:
+            region_id = row["region_id"]
+            condition = row["condition_name"]
+
+            if region_id not in regions:
+                regions[region_id] = {
+                    "id": region_id,
+                    "name": row["region_name"],
+                    "counts": {
+                        "last_10_minutes": {},
+                        "last_hour": {},
+                        "last_12_hours": {},
+                    },
+                }
+
+            counts = regions[region_id]["counts"]
+
+            counts["last_10_minutes"][condition] = row["reports_10_minutes"]
+            counts["last_hour"][condition] = row["reports_1_hour"]
+            counts["last_12_hours"][condition] = row["reports_12_hours"]
+
+        return jsonify(list(regions.values()))
+```
+
+It also provided an example of what it looks like, which I attach here: 
+```JSON
+{
+  "id": 1,
+  "name": "South Bank",
+  "counts": {
+    "last_10_minutes": {
+      "Dry": 0,
+      "Damp": 2,
+      "Wet": 1,
+      "Standing water": 0
+    },
+    "last_hour": {
+      "Dry": 1,
+      "Damp": 4,
+      "Wet": 1,
+      "Standing water": 0
+    },
+    "last_12_hours": {
+      "Dry": 3,
+      "Damp": 5,
+      "Wet": 2,
+      "Standing water": 0
+    }
+  }
+}
+```
+
+### Inline table reading
+For this part, I used the integrated ChatGPT to analyze my home and RegionCard table with hardcoded columns, rows, and set to 0 for the counts to correctly pass the list to the RegionCard and map over it. Unfortunately though, the session chat was deleted and I cannot access the original prompt. 
+
+## Report feedback
+First, I wrote the entire report and left cost calculations pending, then developed a diagram and asked for help with the report. 
+
+### Diagram feedback
+What do you think of this microservice diagram I made 
+[Image]
+
+#### Application
+It suggested more minor fixes, like "Change “2 service pod replicas” → “2 Pod replicas”. Deployments manage the replicas; Services route traffic to them", rellabelling the API boxes to deployments including the CLusterIP :8000, labeling the database with 1 pod StatefulSet with a Headless service 3306, the PVC labelling to GCP persistent Disk, plce it outside of the container, and label the large boundary as a GKE cluster with 3 worker nodes. 
+
+### Report feedback
+Okay, here is my draft of the road report, i am just missing finding out how to fidn the project costs and such... 
+Introduction
+Recently, Brisbane has invested in its cycling infrastructure because such a mode of transport helps reduce traffic congestion, lower emissions, stimulates the local economy and it can boost individuals’ health (Capner Law, 2025). A 2021 survey found that 18.1% of those interviewed in Brisbane had ridden a bike in the past week, 27.2% in the past month and 43.0% in the last year, and of those interviewed within the last month, 83% used it for recreation and 31% for transport (Capner Law, 2025). Besides infrastructure, there are some factors that cyclists must evaluate in order to decide whether they should go for a ride: the weather. A metanalysis of eight years of cycling data from 40 bike-sharing schemes found that “rain and snow are among the worst deterrents for cycling” (Bean et al., 2021)and it is more risky because rain reduces visibility, prolongs the time it takes to brake and wet roads may become slick, increasing the probability of falling (Williams, 2017). That being said, the meta analysis found that riders with more weatherproof infrastructure were more likely to brave the rain (Bean et al., 2021). However, an analysis of the Bureau of Meteorology across 16 Queensland locations from January 2024 to June 2026 found that they were “more likely to miss heavy rainfall than overstate it” because the models utilized to predict rainfall divide regions into seven to ten kilometer grid squares, “meaning they can struggle to capture highly localised rainfall” (Breslin, 2026), indicating the need for an alternative source of information to make riding decisions.
+While Cloud Computing cannot improve the infrastructure and forecast models in place, it can help Brisbane cyclists notify each other of road conditions so they can make a more informed decision as to whether they can utilize alternative routes, transport or engage in another form of recreation to protect themselves. Road Report is a web application where users can view the road conditions of several Brisbane suburbs in a table classifying them as either dry, humid, wet or containing standing water within the last 10 minutes, last hour and last 12 hours. If they wish to make their own reports and assist other cyclists, they can create an account or log in with their credentials. This type of application benefits from cloud computing because the application itself is reliant on crowdsourcing, and a local project would not be able to provide information regarding roads that the user has not braved that day. Not only that, but the scalable nature of cloud computing is useful because there may be less activity at night because less people are riding or when the day is clearly dry, but traffic may increase sharply in hours with ambiguous weather conditions. 
+Technical Solutions
+The frontend was developed with a Vite framework using React, Typescript and Tailwind. The application itself was served using nginx 1.13-alpine. 
+The backend uses a Python-based Flask API with libraries such as datetime to handle timezones and session duration; flask requests, jsonify to convert the results and session to store the users' session cookies; and werkzeug.security to handle password hashing for account creation and login. The app connects to a relational MariaDB database version 13.3, which has four tables storing road condition definition, suburbs, users and report history. It is worth noting that the initial script has thirteen brisbane suburbs that are predefined, and four road conditions–dry, damp, wet and standing water–wheras all users and reports are created by utilizing the web application.
+The deployment was realized in the Google Cloud Compute Engine with a cluster consisting of three nodes, and the services were decoupled into database, accounts, reports and frontend in docker-compose.yaml with their respective Kubernetes configuration defined in k8s/kubernetes.yaml.  The latter specifies that the database and load balancer have only one replica each, but the accounts, reports and frontend services have two pods each. It is worth noting that the database uses GCP’s persistent disk. 
+
+	[ Resource estimation pending ] (e.g., costs of VMs, K8s cluster, networking, Load Balancers, etc.).
+
+Architecture Design
+	Incoming traffic is received by the GCP load balancer and directed to the two frontend deployment pod replicas. The application relies on the accounts service to handle account creation, login, logout and retrieving session information using external libraries like Flasks’ session and werkzeug.security for password hashing. The reports microservice handles fetching road reports when the website loads, allowing only authenticated users to make road reports and obtaining the normalized fields from the database containing suburb names and road conditions to render them in the report pop-up. These two services are connected to a relational database implemented with MariaDB that stores data in the virtual machines’ permanent disk.
+
+#### Application
+Suggested wording clarifications and version modifications with the following table
+| Your wording | Suggested correction |
+|---|---|
+| “Vite framework” | **React frontend built using Vite**, with TypeScript and Tailwind CSS |
+| “MariaDB version 13.3” | **MariaDB 11.8**, matching your deployed image |
+| “flask requests” | Flask’s **`request` object**; `requests` is a different Python library |
+| “session to store users’ session cookies” | Flask sessions **store signed session data in browser cookies** |
+| “Google Cloud Compute Engine with a cluster” | **Google Kubernetes Engine (GKE), using three Compute Engine worker nodes** |
+| “services were decoupled … in docker-compose.yaml” | Components are containerised; **Compose supports local testing, while Kubernetes manages the cloud deployment** |
+| “database and load balancer have only one replica each” | **MariaDB has one Pod; the frontend Service provisions a public load balancer.** The load balancer isn’t a one-replica workload |
+| “virtual machines’ permanent disk” | **GCP Persistent Disk accessed through a PersistentVolumeClaim** |
+
+It also suggested using the Google Cloud Pricing Calculator with an estiamted scenario like 730 hours of operation per month. It specified not to count pods as additional VMs. 
+
+It also sugggested rewording my cloud computing proposal so that I do not imply it auto-scales with cloud computing technology. 
 
 # Sources
 https://blog.miguelgrinberg.com/post/how-to-dockerize-a-react-flask-project Dockerizing a Flask + React project 
