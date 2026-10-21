@@ -32,10 +32,10 @@ I primairly utilized OpenAI's GPT-6.1 Sol, though ocasional quick searches for i
 ## Purpose of Use
 I used the tool to brainstorm my general project architecture, obtain guidance as to what I needed to investigate to work on the project, feedback at my implementation attempts, assistance with generating secrets, obtaining Flask endpoint templates because it was a new technology for me, help with React components, backend function corrections and implementation suggestions and revision of my individual report. There are many things I did not know how to do before starting the project, and the tool helped me understand better how I could apply the concepts learned in class–and investigate new ones–in order to build a funcional web application. I always took care to read the suggestions and question what was presented to truly enhance my learning. I noticed it took me a while to learn the commands, and I began to generate my own document that now has over 18 pages with key commands for this project, which I can now apply without resorting to the tool. 
 
-## Prompts Used and Application
+## Brainstorming Prompts
 The section below will include key prompts and their applications throughout the project. 
 
-### Brainstorming
+### Initial brainstorming
 [Project instructions and rubric criteria files uploaded]
 Self-reporting map rain, I have noticed that BNE has really bad weather forecasts. Like I’ll wake up, and see rain forecast, and then go for an entire ride with literally no rain so I almost cancel my rides because of nothing. I’ve seen that there are like magpie swooping maps and such, but maybe a community website that reports the rain. - It could be an open street map with basic api that just sends the time and location, so cyclists can report rain in an area and classify as cloudy, drizzing, moderate rain, strong rain, dry once its over. So it kinda cloudsources a reported rain map.
 - Back home my dad is in a WA chat where ppl will ask if like Huasteca is dry to see if they go riding there, so this could kinda help the community explore and people can reshape their training/commutes around whether it is actually raining than a bad forecast.
@@ -66,12 +66,13 @@ Suggested to use the following stacks based on my architecture
 | Local environment | Docker Compose | Runs the whole application on your laptop |
 | Cloud deployment | Kubernetes across GCP VMs | Replicas, load balancing, failure recovery, updates |
 
-And it recommended using just two backend services of api/auth and api/reports. Note it suggested using PostgreSQL, I opted for MariaDB. 
+And it recommended using just two backend services of api/auth and api/reports. Note it suggested using PostgreSQL, I opted for MariaDB. It is worth mentioning the idea is entirely my own, I am a cyclist and have struggled to ride in Brisbane because I struggle to know when it will rain; back home, my dad has a whatsapp chat where riders compare conditions, so this is a way to facilitate that information sharing.
 
 ### Container base 
 Honestly, I am really confused now.... For task 1, I aws given a github file that had the app folder with public src worker and a composer.json with a basic name of the class descritpion type project using just php and and optimize autoloader and such. A folder database with an init.sql just CREATE TABLE commands and insert products. An nginx folder with a default.conf that just had a server listening on port 80, location try_files $uri $uri/ /index.php?$query_string;... so i guess this was just their nginx. 
 
 The website was just simple php, and I wrote the following docker file: 
+```
 # syntax=docker/dockerfile:1
 # Included build syntax because of AI feedback 
 
@@ -131,8 +132,10 @@ CMD ["php-fpm", "-F"]
 # suggested to use in-built php and check extensions are loaded for maria and redis with the CMD provided 
 HEALTHCHECK --start-period=10s --interval=30s --timeout=5s --retries=3 \
 	CMD php -r 'exit(extension_loaded("mysqli") && extension_loaded("pdo_mysql") && extension_loaded("igbinary") && extension_loaded("redis") ? 0 : 1);'
+```
 
 Then, I wrote a docker-compose.yml:
+```yaml
 services: 
   # 2. MariaDB
   db: 
@@ -294,14 +297,14 @@ networks:
     driver: bridge
   backend:
     driver: bridge
-
-
+```
 
 I do not know or like php, I would rather do either basic base ugly html or react. Someone inthe class asked whether they could reuse the starter application, and they said they were "I'm thinking of building on that application and adding the required features, such as microservices, Docker Swarm, scalability, load balancing, and rollout/rollback. the cca1 repository also includes starter PHP application code (such as index.php and order.php). Would we be allowed to reuse that existing application as the base and extend it with the additional Type I requirements, provided the cloud deployment and additional implementation are our own work?"
 
 The prof said "Hi, cca1 only contains dockerfile and docker-compose.yml file, if this is the application that you mentioned then yes, you can use it. as long as the dockerfile and docker-compose.yml file are your work then this won't affect the marks for originality and innovation. Yes, you can use those files"
 
 I also had anotherp orject for a jupyter notebook that had a data folder with csv of the data, a provided folder with distributed_runtime.py, base FAISS.ipynb notebok we had to work on and also some commands.sh, kubernetes.yaml where this is what I did for kubernetes.yml:
+```yaml
 # INFS3208 A2 
 # Do not rename Kubernetes objects, labels, ports, or volume names.
 
@@ -479,6 +482,7 @@ spec:
       port: 8080 # Externally exposes port I think, AI suggested change from containerPort to port and removing a leading -
       targetPort: 8888 # Fowards traffic to jupyter port
   type: LoadBalancer
+```
 
 So anyway, important distinction is I can base myself off from previous work, I need to understand it though. I want to build the simplest form of my web app possible, just having the simple user logins, databases, and the microservice stuff. not sure if i can do it all within one github file and just wirte the docker files cause idk if that will actually meet the rubric criteria saying "Microservice architecture and containerization: Decouple
 functionalities into microservices and run these microservices in
@@ -486,78 +490,353 @@ individual containers."
 
 So idk if i have to do one microservice container for login/logout, one for account creation (but I guess login stuff will be related same table schema), one for data posting when making report, one for data fetching to get the road reports in main website display. Pretty much, I know i can make a website in react easily enough, I dont know how to even deploy the containers or decouple the microservices in individual containers. i dont know if all of my previous work has just been one same container beignrun or if i have accidentally already created more than one container in one dockerfile/yaml
 
-### Base for Flask
-### Gemini: Base prompt for stack setup recommendation
-"react with maria db and flask api monorepo"
+#### Application
+Tool corrected that I was already running many containers in both assignments, and it suggested a simple React project with two Flask APIs and one database because I was trying to decouple the services too much in my prompt. It also corrected a key logic error that two build stages does not mean two running application contaienrs, rather the compose file is the one decoupling the containers and explained what that looked like for a previous assignment I had done. This was mostly useful just to try to understand the setup and choose my technology task for this project. It also hel'ed me structure the files, where the key correction is that I divided the accounts and reports as api-accounts and api-repots folders, docker-compose.yaml and I put the kubernetes file in a k8s folder for the table suggestion it generated: 
+| Location | Contents |
+|---|---|
+| `frontend/` | React website, frontend Dockerfile, Nginx configuration |
+| `accounts/` | Account Flask application, dependencies, Dockerfile |
+| `reports/` | Reports Flask application, dependencies, Dockerfile |
+| `database/init.sql` | Tables and sample records |
+| `compose.yaml` | Defines how the four components run together locally |
+| `kubernetes.yaml` | Defines their cloud deployment and networking |
+
+### Brainstorming for project 
+quikc style question, should i make it so that i show like South bank and then below like an sql function that checks reports within a time period differentiating conflicting reports...&#x20;
+
+or idk if maybe i can even have the person indicate like "Rideable" and a column in the table indicating the total counts as like yeah you can still ride or too wet based on their opinion.
+
+\* Damp: reported by 10 within last 10 minutes&#x20;
+
+\* Wet: reported by 5 within last 10 minutes&#x20;
+
+\---- here it uses the last 10 min reprots + whatever was reported within last hour&#x20;
+
+\* Damp: reported by 20 within last hour
+
+- Wet: reported by 5 within last hour
+
+---
+
+- Dry: reported by&#x20;
+
+Or idk, just make a table where row is time ago and then each cell is the number of reports, maybe adding rideable column.&#x20;
+
+| Time period | Dry | Damp | Wet | Standing water |
+
+Last 10 minutes | 0 | 10 | 5 | 0 |
+
+Last hour | 0 | 0 20 | 5 | 0 |
+
+So based on this, ppl can see and maybe say ok its leaning towards damp.&#x20;
+
+But then wet and standingwater indicate a nah can't ride.&#x20;
+
+I guess I could just do within last 10 mins, last hour, last 12 hours and more than that undetermined. its cause maybe as a rider if road is damp or wet, i can go ride in flat like south bank loop around the river.  if its damp, wet, or standing water i cant go to mt coot tha. its possible it rains overnight and main roads are dry, but mt coot tha is still wet because there is more tree cover there, but maybe routs alng the north bikeway are flatter and drier so a damp road is more acceptable–even with a few m of elevation difference- than it is to go to mt coot tha...
 
 #### Application
-Got sample output of base for Flask  
+It suggested I use my proposed table setup itself, which was useful just for idea specification and the hand-drawn wireframes I made.
+
+## Database Feedback prompts
+### Initial database suggestions
+Okay so I already made all of the base layout pages that I set out in app and added a navbar component to show up on app layout, and a basic simple login and register page with just front end. I have the schema I want for my database, and I think I want now your help to revise it and general thoughts. i used the format my prof provided, so i think i'd like to use mariadb as well lol: 
+```sql
+CREATE TABLE IF NOT EXISTS regions (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS conditions (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description VARCHAR(100) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS users (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS reports (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    reported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+    user_id INT UNSIGNED NOT NULL,
+    condition_id INT UNSIGNED NOT NULL,
+    region_id INT UNSIGNED NOT NULL,
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id), 
+    CONSTRAINT fk_condition FOREIGN KEY (condition_id) REFERENCES conditions(id), 
+    CONSTRAINT fk_region FOREIGN KEY (region_id) REFERENCES regions(id), 
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO regions (id, name) VALUES 
+    (1, 'South Bank'), 
+    (2, 'Kangaroo Point'),
+    (3, 'Toowong'),
+    (4, 'Mount Coot-tha')
+    (5, 'Kenmore Hills'),
+    (6, 'Mount Gravatt'),
+    (7, 'Upper Mount Gravatt'),
+    (8, 'Burbank'),
+    (9, 'Wynnum'),
+    (10, 'Enoggera'),
+    (11, 'Nudgee'), 
+    (12, 'Boondall'),
+    (13, 'Shorncliffe');
+```
+
+#### Application
+It let me know I had syntax errors with trailing commas after fk_region, missed one separating Mt. Coot-tha, suggested I make usernames unique to avoid collisions, add a separate submission and observation fields, and suggested the initial conditions that I had forgotten to include in my script using the previous categories I had described: 
+```sql
+INSERT INTO conditions (id, name, description) VALUES
+    (1, 'Dry', 'No visible surface moisture'),
+    (2, 'Damp', 'Surface is moist with little visible water'),
+    (3, 'Wet', 'Visible water across the surface'),
+    (4, 'Standing water', 'Puddles or accumulated water');
+```
+
+## Base for Flask
+### Setting up Flask project
+Okay, so I do not know how to create a monorepo flask api thing. Ive created a folder called backend with a requirements folder,  I ran "pip install Flask" and then in the requirements.txt wrote Flask==3.1.2. I created an api-accounts folder and an api-records folder, and i know i need to create the app with from flask import Flask, somehow ocnfigure the connection as well and then use it. but idk, since i dont know how to use microservices idk if its supposed to be technically two different apis in my same container, should i init both of them seperately...? I think i need it so that if login is down, then the other one can still fetch the suburb reports. but i am not sure if i should create an env file, how i would confiugre the secrets, and stuff like that so i dont even know how to set up the connection. my professor for the first project just gave us a predefined env as such: 
 ```python
-# backend/requirements.txt
-# flask
-# flask-sqlalchemy
-# pymysql
-# flask-cors
+APP_PORT=8080
+PMA_PORT=8082
+PHP_VERSION=8.4
 
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
+DB_HOST=db
+DB_PORT=3306
+DB_NAME=cloud_computing
+DB_USER=php
+DB_PASSWORD=php_dev_password
+DB_ROOT_PASSWORD=change_this_root_password
+
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_QUEUE=orders
+```
+
+So i dont know what to do like how to structure the API, and base starter code for flask would be greatly appreciated
+
+#### Application
+In previous units, I had been provided a starter Flask code but I did not know how well it aligned with the scope of this project, and I wanted to save time with help setting up the flask configuration because that was not a critical aspect of our evaluation, merely a stepping stone to base my future work. This helped me to specify I should add a requirements.txt, install depenencies in the venv with 
+```bash
+python3 -m venv backend/.venv
+source backend/.venv/bin/activate
+```
+
+And specify the requirements with 
+```
+Flask==3.1.2
+PyMySQL
+python-dotenv
+```
+
+Then, I shoul dinstall the requirements with ```python -m pip install -r backend/requirements.txt```, create an .env file that I created at root instead of in the suggested backend, and generate an .env.example.
+```
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=cloud_road_report
+DB_USER=road_app
+DB_PASSWORD=replace_with_your_local_db_password
+```
+
+It also provided the base code for the connection for the database with 
+```python
 import os
+from pathlib import Path
 
-db = SQLAlchemy()
+import pymysql
+from dotenv import load_dotenv
 
-def create_app():
-    app = Flask(__name__)
-    CORS(app)  # Allows React frontend to communicate with Flask
+# Both service folders have backend/ as their parent.
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(env_path)
 
-    # MariaDB connection string format: mysql+pymysql://user:password@host:port/db_name
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
-        'DATABASE_URL', 
-        'mysql+pymysql://root:password@localhost:3306/mydb'
+
+def get_connection():
+    return pymysql.connect(
+        host=os.environ["DB_HOST"],
+        port=int(os.environ.get("DB_PORT", "3306")),
+        user=os.environ["DB_USER"],
+        password=os.environ["DB_PASSWORD"],
+        database=os.environ["DB_NAME"],
+        charset="utf8mb4",
+        cursorclass=pymysql.cursors.DictCursor,
+        connect_timeout=5,
+        init_command="SET time_zone = '+00:00'",
     )
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+```
+Which I read and modified to instead provide the env at root instead of at the current directory. It also provided a base configuration for the accounts api health check: 
+```python
+from flask import Flask
 
-    db.init_app(app)
+app = Flask(__name__)
 
-    with app.app_context():
-        from . import routes
-        db.create_all()  # Creates tables if they don't exist
 
-    return app
+@app.get("/api/accounts/health")
+def health():
+    return {
+        "service": "accounts",
+        "status": "running",
+    }
+```
+And for records a base health check and an example of a get for the region names that I did not ask for, but I did use this previuos version to understand how to structure GET endpoints; note this was heavily modified later on to return actual information, but this was useful just to test connection of frontend with API with database
+```python
+import pymysql
+from flask import Flask, jsonify
 
+from db import get_connection
+
+app = Flask(__name__)
+
+
+@app.get("/api/records/health")
+def health():
+    return {
+        "service": "records",
+        "status": "running",
+    }
+
+
+@app.get("/api/records/regions")
+def get_regions():
+    try:
+        connection = get_connection()
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT id, name FROM regions ORDER BY name"
+                )
+                regions = cursor.fetchall()
+        finally:
+            connection.close()
+
+        return jsonify(regions)
+
+    except pymysql.MySQLError:
+        app.logger.exception("Could not retrieve regions")
+        return {"error": "Database temporarily unavailable"}, 503
 ```
 
-Sample output base for connectivity to App
+For base testing, it suggested commands to run it, which is how I did initial development before my Dockerfiles: 
 ```
-import { useEffect, useState } from 'react';
+source backend/.venv/bin/activate
+cd backend/api-accounts
+python -m flask --app app run --debug --port 5001
+```
 
-function App() {
-  const [data, setData] = useState([]);
+```
+source backend/.venv/bin/activate
+cd backend/api-records
+python -m flask --app app run --debug --port 5002
+```
 
-  useEffect(() => {
-    // Points to the Flask local development server
-    fetch('http://localhost:5000/api/data')
-      .then((res) => res.json())
-      .then((data) => setData(data))
-      .catch((err) => console.error("Error fetching data:", err));
-  }, []);
+### Dockerfile corrections
+Ok wait don't i need to write a dockerfile as well? I created here a base for the dockerfile and docker-compose, idk if instead of testing it in the docker desktop it might be better if i start working through to deploy it on GCE... but I do need it to run locally as well cause I need to test the development on my machine cuase it's easier ot develop in vscode than in vim.&#x20;
 
-  return (
-    <div>
-      <h1>Items from MariaDB via Flask</h1>
-      <ul>
-        {data.map((item) => (
-          <li key={item.id}>{item.name}</li>
-        ))}
-      </ul>
-    </div>
-  );
+
+
+I currently have CloudReport as my base, i know i hve to serve server {\
+&#x20;   listen       80;\
+&#x20;   server_name  localhost;\
+&#x20;   location / {\
+&#x20;       proxy_pass   http\://backend:8000;\
+&#x20;   }\
+\
 }
 
-export default App;
+
+
+Somewhereor smth along those lines idk i found an example repo and kinda remixed a lot of stuff together, but i need help to like actually map ports and get the files to work...the file i am copying has nginx-flask-mysql/proxy/conf with that file, and their dockerfile is just&#x20;
+
+FROM nginx:1.13-alpine\
+COPY conf /etc/nginx/conf.d/default.conf
+
+
+
+Not sure if i can make my project just use a multistage build or if i am supposed to have many different dockerfiles for each service. My requirements.txt just has Flask==3.1.2\
+PyMySQL\
+python-dotenv.&#x20;
+
+
+
+From what I see, MariaDB is supposed to work natively with Flask so I have commented out al stuff related to it so I just commented all of it out. First lets get thedockerfile working no? Then we can move onto the compose?&#x20;
+
+
+```
+# syntax=docker/dockerfile:1
+
+# Backend with Python
+FROM python:3.13.5-alpine AS builder
+
+WORKDIR /CloudRoadReport
+# Install requirements to api-accounts and api-reports passing the env files that are in root to backend files
+COPY backend/requirements.txt backend/api-accounts/app.py .env .
+COPY backend/requirements.txt backend/api-reports/app.py .env .
+RUN pip install -r ./requirements.txt
+# Idk what the difference between production and development is
+ENV FLASK_ENV development
+
+# Extensions for MariaDB, I had done base with php-ext for mysqli, pdo_mysql, pecl igbinary  
+#RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
+#&& docker-php-ext-install mysqli pdo_mysql \
+#&& pecl install igbinary redis \
+#&& docker-php-ext-enable igbinary redis \
+#&& rm -rf /tmp/pear \
+#&& apk del .build-deps
+#WORKDIR /var/www/html
+# AI suggestion so line corrected from # /var/www/html/vendor because I had not included the --from=builder was missing so that rendered the multi-stage
+# approach practically useless, and it also identified that I had to copy the /app/vendor to the current working directory vendor
+#COPY --from=builder /app/vendor  ./vendor 
+
+# nginx to serve React
+FROM nginx:1.30-alpine
+# No idea how to even configure it
+COPY conf /etc/nginx/conf.d/default.conf 
+
+EXPOSE 5000
+CMD ["flask", "run"]
+
+# Healthcheck 
+HEALTHCHECK --start-period=10s --interval=30s --timeout=5s --retries=3 \
+    CMD curl --fail http://localhost:5000/health || exit 1
 ```
 
-Base docker compose 
+#### Application
+Fixed the Dockerfile wth suggestions, it letme know I was mixing up frontend and backend that should be decoupled. It suggested a base backend file taht I modified to keep only what was necessary, so I had read about gunicorn but I just left it at a more basic version of this code with what I understood, and added gunicorn to backend. 
+```# syntax=docker/dockerfile:1
+
+FROM python:3.13-slim
+
+# Select which API this image will contain.
+ARG API_SERVICE=api-reports
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Install dependencies before copying application code.
+COPY backend/requirements.txt /app/backend/requirements.txt
+
+RUN pip install --no-cache-dir \
+    -r /app/backend/requirements.txt
+
+# Preserve your directory structure so db.py's path logic still works.
+WORKDIR /app/backend/${API_SERVICE}
+
+# Copy only the selected API, including app.py and db.py.
+COPY backend/${API_SERVICE}/ ./
+
+EXPOSE 8000
+
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
+```
+
+It also suggested a root .dockerignore that I did add with the .git, .env, python configurations, nodemodules and dist files. 
+The main correction was that I was supposed to be running the backend Dockerfile first instead of mixing both weirdly. It also helped with commands to build and test it locally.
+
+## Base docker compose 
 ```yaml
 version: '3.8'
 
