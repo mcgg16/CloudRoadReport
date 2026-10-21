@@ -1,30 +1,3 @@
-# Project Installation
-This specification assumes that Google's Cloud Engine is being used and a VM and kubernetes cluster are already configured. Additionally, gcloud, kubectl, docker, vim and GKE authentication plugins are installed.
-
-Pull repository from GitHub: ```git clone https://github.com/mcgg16/CloudRoadReport && cd CloudRoadReport/``` and copy the .env.example file values by navigating to ```vim .env.example``` and then typing ```vim .env```; the env that was used for this submission will be attached in blackboard. Then, run the following command to create the database 
-```
-kubectl create configmap road-db-init \
-  --from-file=01-init.sql=database/init.sql \
-  --dry-run=client -o yaml \
-  | kubectl apply -f -
-```
-
-For local testing, ```docker compose build``` to build the services, then ```docker compose up -d``` and access via the VM?s external IP with http:<EXTERNAL_IP>:8080, which may be subject to firewall rules.
-
-To test with kubernetes, check which project is being used with ```gcloud config get-value project```, and, if necessary, create a cluster that can be utilized for testing this project. Then, scale the nodes using the following command, modifying zone with respect to the clusters' zone and the previuos project id as necessary:
-```bash
-gcloud container clusters resize road-report-cluster \
-  --node-pool=default-pool \
-  --num-nodes=3 \
-  --zone=ZONE \
-  --project=ID
-```
-
-Then, generate a session token by running ```bash k8s/setup_session_secret.sh``` in order to authenticate users. Then, run ```kubectl apply -f kubernetes.yaml``` and wait for the configuration to be applied. Afterwards, type ```kubectl get services``` and wait for the service named frontend of type LoadBalancer to come online. It will generate an EXTERNAL-IP, type http://<EXTERNAL_IP> in the browser. 
-
-## Basic project flow
-Once installed, there will be no reports already in the database–only configured regions showing that no reports have been made as indicated by the 0s. Since there are no users configured, it is necessary to click on "Register" in the navigation bar with the desired credentials, which will enable the report button "+ Make report". Once clicked, a pop-up opens, allowing the user to choose a suburb, road condition, and time of observation. Once done, click "Submit" and, if the report time was set within the last 12 hours, watch how the suburb table is modified accordingly. Once you are done, click on "Sign Out". If you wish to log in again, use the same credentials to start your session. Please note the session has a duration of six hours, after which signing in again will be necessary to log in again.
-
 # AI Declaration
 ## AI Tools Used
 I primairly utilized OpenAI's GPT-6.1 Sol, though ocasional quick searches for implementations also brought up results from Gemini highlighted below. 

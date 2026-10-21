@@ -56,7 +56,7 @@ Then, . Then, run ```kubectl apply -f kubernetes.yaml``` and wait for the config
 
 ## Scalability
 
-## Repliability
+## Reliability
 
 ## Load balancing
 
