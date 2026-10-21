@@ -3104,6 +3104,124 @@ window.location.replace('/');
 ```
 that way, it would detect when the rendeing was changed to home from the navbar and regenerate the window.
 
+## Regions pop-up
+### Initial database call corrections
+This is the post I am building for the reports with the following schema:&#x20;
+
+Note regions and conditions are already defined:&#x20;
+
+CREATE TABLE IF NOT EXISTS reports (\
+&#x20;   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\
+&#x20;   observed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\
+&#x20;   submitted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\
+&#x20;   user_id INT UNSIGNED NOT NULL,\
+&#x20;   condition_id INT UNSIGNED NOT NULL,\
+&#x20;   region_id INT UNSIGNED NOT NULL,\
+&#x20;   CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id), \
+&#x20;   CONSTRAINT fk_condition FOREIGN KEY (condition_id) REFERENCES conditions(id), \
+&#x20;   CONSTRAINT fk_region FOREIGN KEY (region_id) REFERENCES regions(id), \
+&#x20;   INDEX idx_reports_region_time (region_id, observed_at)\
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\
+
+
+
+
+Let me know what you think, I want to now start working on the pop-up to make a report, this is for /api-reports
+```
+@app.post("api/reports/make")
+def make_report(): 
+    data = request.get_json(silent=True)
+    
+    # Unauthorized access
+    if not session: 
+        return {"error": "No active session"}, 401
+
+    # Badly structured gives an error
+    if not isinstance(data, dict):
+        return {"error": "Expected username and password as JSON"}, 400
+
+    # POST with report info
+    observed_at = data.get("observed_at") # May differ from default wheras submitted_at does adhere perfectly
+    user_id = data.get("user_id")
+    condition_id = data.get("condition_id")
+    region_id = data.get("region_id")
+
+    # One of them is empty 
+    if not isinstance(observed_at, user_id, condition_id, region_id):
+        return {"error": "Missing information to generate report"}, 400
+    
+    # Check numeric keys 
+    if not isinstance(user_id, (int)):
+        return {"error": "user_id is is not a number"}, 400
+    if not isinstance(condition_id, (int)):
+            return {"error": "Condition is not a number"}, 400
+    if not isinstance(region_id, (int)):
+            return {"error": "region_id is not a number"}, 400
+    
+    # Establish connection to make the post
+    try:
+        connection = get_connection()
+        
+        # SQL query to execute, and extract id that was just generated with %s to pass the strings
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO reports (observed_at, user_id, condition_id, region_id)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (observed_at, user_id, condition_id, region_id),
+            )
+            id = cursor.lastrowid
+
+        # All went smoothly, 
+        connection.commit()
+
+        # For error logging
+        return {"id": id, "user_id": user_id, "region_id": region_id, "condition_id": condition_id}, 201
+
+    # Got SQL error from non-unique username 
+    except pymysql.IntegrityError as error:
+        # Error inserting
+        app.logger.exception("Report failed")
+        return {"error": "Could not create make report"}, 500
+
+    # Something else failed
+    except pymysql.MySQLError:
+        if connection is not None:
+            connection.rollback()
+
+        app.logger.exception("Report database error")
+        return {"error": "Database temporarily unavailable, please try again later"}, 503
+
+    # Once done, closes the connection
+    finally:
+        if connection is not None:
+            connection.close()
+```
+
+#### Application
+It generated a table of the key corrections I needed to realize 
+| Current code | Change |
+|---|---|
+| `@app.post("api/reports/make")` | Add the leading `/` |
+| `if not session` | Check specifically for `session.get("user_id")` |
+| `user_id = data.get("user_id")` | Get the user ID from the validated session |
+| `isinstance(observed_at, user_id, ...)` | Validate each value separately; `isinstance` accepts a value and a type |
+| `connection` assigned inside `try` | Initialise it to `None` before the `try` |
+| Integrity error says duplicate username | Report submission errors concern foreign keys, not usernames |
+
+It also suggested I add to kubernetes env 
+```
+- name: SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: road-session-secret
+      key: SECRET_KEY
+```
+
+### 
+
+
 # Sources
 https://blog.miguelgrinberg.com/post/how-to-dockerize-a-react-flask-project Dockerizing a Flask + React project 
 https://github.com/docker/awesome-compose/tree/master/nginx-flask-mysql Docker documentation sample nginx-flask-mysql
