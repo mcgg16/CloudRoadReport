@@ -129,14 +129,46 @@ reports-69c85dcc4c-vttmw    1/1     Running   0               4h38m
 Then, restore the previous configuration with ```kubectl scale deployment reports --replicas=2``` to see how manual scaling takes place. 
 
 ## Reliability
+View the accounts pods that are currently listed with ```kubectl get pods -l app=accounts```: 
+```bash
+NAME                        READY   STATUS    RESTARTS   AGE
+accounts-6987dd94d5-7t92n   1/1     Running   0          4h40m
+accounts-6987dd94d5-gb9q2   1/1     Running   0          4h40m
+```
 
+Then, copy one of the names and delete it with ```kubectl delete pod accounts-6987dd94d5-gb9q2```, and then run ```kubectl get pods -l app=accounts``` again to see how a new pod was created replacing the second one, demonstrating reliability when a node goes down. 
+```bash
+NAME                        READY   STATUS    RESTARTS   AGE
+accounts-6987dd94d5-7t92n   1/1     Running   0          4h41m
+accounts-6987dd94d5-cct5n   1/1     Running   0          36s
+``` 
 
 ## Load balancing
+Load balancing is visible by typing ```kubectl get service frontend``` to isolate only the frontend service, which also shows its external IP that can be used to access the web application frontend, and the internal services defined distribute the connections between the service and account replicas. 
+```bash
+NAME       TYPE           CLUSTER-IP      EXTERNAL-IP    PORT(S)        AGE
+frontend   LoadBalancer   34.118.237.26   34.129.175.8   80:32394/TCP   2d1h
+```
 
 ## Rollout and rollback
-### Rollout
+View the past rollouts with ```kubectl rollout history deployment/frontend```
+```bash
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+3         <none>
+4         <none>
+7         <none>
+9         <none>
+10        <none>
+11        <none>
+```
 
-### Rollback
+I will restore to the first version with ```kubectl set image deployment/frontend frontend=australia-southeast2-docker.pkg.dev/project-5472a16f-e6cd-4347-b79/road-report/frontend:v1``` and manually refresh the window on the LoadBalancer external IP. This will take it back to the first verion that does not show table reports, nor does it have any functionalities besides basic navigation between the login, create account, and home page. 
+
+To return it to the previuos version, type ```kubectl rollout undo deployment/frontend --to-revision=11``` with my last revision beign the 11th. 
+
+The kubernetes.yaml is configured to always pull the most recent images for frontend, accounts, and services. When the code is changed, it is necessary to rebuild, retag, and push the new images with a version that matches one established in the kubernetes.yaml images specified. 
 
 ## Interacting with application
 Once installed, there will be no reports already in the database–only configured regions showing that no reports have been made as indicated by the 0s. Since there are no users configured, it is necessary to click on "Register" in the navigation bar with the desired credentials, which will enable the report button "+ Make report". Once clicked, a pop-up opens, allowing the user to choose a suburb, road condition, and time of observation. Once done, click "Submit" and, if the report time was set within the last 12 hours, watch how the suburb table is modified accordingly. Once you are done, click on "Sign Out". If you wish to log in again, use the same credentials to start your session. Please note the session has a duration of six hours, after which signing in again will be necessary to log in again.
