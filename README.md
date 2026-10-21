@@ -32,6 +32,8 @@ I primairly utilized OpenAI's GPT-6.1 Sol, though ocasional quick searches for i
 ## Purpose of Use
 I used the tool to brainstorm my general project architecture, obtain guidance as to what I needed to investigate to work on the project, feedback at my implementation attempts, assistance with generating secrets, obtaining Flask endpoint templates because it was a new technology for me, help with React components, backend function corrections and implementation suggestions and revision of my individual report. There are many things I did not know how to do before starting the project, and the tool helped me understand better how I could apply the concepts learned in class–and investigate new ones–in order to build a funcional web application. I always took care to read the suggestions and question what was presented to truly enhance my learning. I noticed it took me a while to learn the commands, and I began to generate my own document that now has over 18 pages with key commands for this project, which I can now apply without resorting to the tool. 
 
+Below, I will provide some of the key commands utilized to develop the project and their application.
+
 ## Brainstorming Prompts
 The section below will include key prompts and their applications throughout the project. 
 
@@ -3719,14 +3721,13 @@ It also suggested using the Google Cloud Pricing Calculator with an estiamted sc
 
 It also sugggested rewording my cloud computing proposal so that I do not imply it auto-scales with cloud computing technology. 
 
-# Sources
+# Sources used during development
 https://blog.miguelgrinberg.com/post/how-to-dockerize-a-react-flask-project Dockerizing a Flask + React project 
 https://github.com/docker/awesome-compose/tree/master/nginx-flask-mysql Docker documentation sample nginx-flask-mysql
 https://stackoverflow.com/questions/75959625/flask-docker-health-check Dockerfile health check
 https://github.com/bahachammakhi/docker-react-nginx-blog Dockerfile for nginx
 https://www.docker.com/blog/how-to-dockerize-react-app/ Dockerize a react app from the docker blog
 https://docs.docker.com/guides/reactjs/ More react for nodejs
-[ a lot of it to get the cloud clusters up and running ]
 https://stackoverflow.com/questions/77764974/how-do-i-deploy-and-run-an-applications-on-k8s Kubernetes on react
 https://medium.com/@cldop.com/deploying-a-two-tier-application-with-flask-reactjs-and-postgresql-on-a-local-kubernetes-cluster-8f0afad8612b 
 https://amlanscloud.com/reactappdeploy/ Kubernetes, useful diagram of architecture
@@ -3740,12 +3741,15 @@ https://mariadb.com/docs/server/server-management/automated-mariadb-deployment-a
 https://kubernetes.io/docs/concepts/workloads/controllers/deployment/ Deployment and updates theory
 https://www.youtube.com/watch?v=78s-fW-zv6E Example in yaml
 
-Website itself
+Website functionalities and design
 https://tutorial101.blogspot.com/2023/04/react-and-python-flask-login-register.html Login 
 https://www.geeksforgeeks.org/python/how-to-add-authentication-to-your-app-with-flask-login/ Login
 https://stackoverflow.com/questions/77868617/state-management-of-multiple-buttons Button families
 https://stackoverflow.com/questions/40575501/how-do-i-properly-get-the-date-and-time Time
 https://tailwindcss.com/docs/table-layout tables
+Note: I used a project I developed last semester to analyze some of my teams' implementations, such as the basic pop-up component structure and handling its opening and closing while rendering it onto the screen: 
+https://github.com/A0GV/WebHomecourt
 
+Report
 https://bytebytego.com/guides/what-does-a-typical-microservice-architecture-look-like/ Diagram
 https://www.geeksforgeeks.org/system-design/microservices/ Diagram 
