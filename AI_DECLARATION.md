@@ -3694,6 +3694,9 @@ It also suggested using the Google Cloud Pricing Calculator with an estiamted sc
 
 It also sugggested rewording my cloud computing proposal so that I do not imply it auto-scales with cloud computing technology. 
 
+### Key commands
+While I do not retain the original prompts, it often provided me with examples of commands to test my implementations did work, which I gathered in an external document and then used as a base for the README.md installation guide. 
+
 # Sources used during development
 https://blog.miguelgrinberg.com/post/how-to-dockerize-a-react-flask-project Dockerizing a Flask + React project 
 https://github.com/docker/awesome-compose/tree/master/nginx-flask-mysql Docker documentation sample nginx-flask-mysql
